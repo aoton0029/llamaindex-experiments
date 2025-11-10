@@ -1,0 +1,72 @@
+# テストパターン設定ファイル
+# 実験で試行する組み合わせパターンを定義
+
+# 実験パターンの定義
+# 因子: チャンキング手法、インデックスタイプ、埋め込みモデル、LLM、AdvancedRAGパラメータ
+
+basic_patterns:
+  vector_001:
+    name: "VectorDB_RAG_with_TokenChunking_and_OllamaQwen3"
+    description: "ベクトルDB RAG - トークンチャンキング + Ollama Qwen3埋め込み + Ollama Qwen3 LLM"
+    enabled: true
+    storage:
+      vector_namespace: "vector_001"
+      docstore_namespace: "vector_001"
+      index_namespace: "vector_001"
+      graph_node_label: "Entity"
+      graph_rel_type: "RELATED"
+    tokenizer_config:
+      type: "huggingface_ruri_v3_310m"
+    embedding_config: 
+      type: "ollama_qwen3"
+    llm_config: 
+      type: "ollama_qwen3_32b"
+    chunking_config: 
+      type: "token_based"
+    indexing_config:
+      type: "vector"
+    evaluation_config:
+      enabled: true
+      engine: "llamaindex"
+      top_k: 3
+      dataset:
+        source: "auto"  # 'auto', 'file', 'huggingface'
+        size: 20  # 自動生成時の質問数
+        questions_per_chunk: 2
+        include_contexts: true
+        # question_types: ['factual', 'analytical']  # オプション
+        
+        # ファイルから読み込む場合
+        # source: "file"
+        # path: "./datasets/my_dataset.json"
+        # format: "json"  # 'json' or 'jsonl'
+        
+        # HuggingFaceから読み込む場合
+        # source: "huggingface"
+        # name: "squad"
+        # split: "validation"
+        # query_field: "question"
+        # answer_field: "answers"
+        # context_field: "context"
+      
+      # 評価器の設定
+      evaluators: 
+        - "faithfulness"
+        - "relevancy"
+        - "correctness"
+        - "semantic_similarity"
+      
+      # 評価器固有の設定
+      faithfulness_config:
+        # FaithfulnessEvaluator用の設定
+      
+      relevancy_config:
+        # RelevancyEvaluator用の設定
+      
+      correctness_config:
+        threshold: 3.0
+      
+      semantic_similarity_config:
+        threshold: 0.8
+        use_japanese_model: true
+        use_global_embed: true  # Settings.embed_modelを使用
