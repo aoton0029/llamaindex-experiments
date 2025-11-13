@@ -38,7 +38,6 @@ sentence-transformers
 ragas
 datasets
 huggingface-hub
-
 pandas
 numpy
 matplotlib
@@ -48,6 +47,7 @@ evaluate
 rouge-score
 bert-score
 tiktoken
+asyncio
 nest-asyncio
 accelerate
 pytest
@@ -56,4 +56,3 @@ pymupdf
 pymupdf4llm
 spacy
 nltk
-asyncio

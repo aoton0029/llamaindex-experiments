@@ -1,13 +1,9 @@
 {
   "name": "Python 3.12 Dev Container",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "..",
-    "args": {
-        "DOCKER_NETWORK": "your_network_name"
-    }
-  },
-  "remoteUser": "vscode",
+  "dockerComposeFile": [
+      "./docker-compose.yml"
+  ],
+  "service": "app", 
   "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {

@@ -7,11 +7,8 @@ RUN apt-get update \
 		build-essential \
 		git \
 		wget \
-		ffmpeg \
-		libsndfile1 \
-		libgl1 \
+	&& python -m pip install --upgrade pip setuptools wheel \
 	&& rm -rf /var/lib/apt/lists/*
 
-COPY .devcontainer/requirements.txt /tmp/requirements.txt
-RUN python -m pip install --upgrade pip setuptools wheel \
-	&& pip install --no-cache-dir -r /tmp/requirements.txt || true
+COPY ./requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt

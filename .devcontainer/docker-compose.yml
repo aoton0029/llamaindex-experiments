@@ -1,0 +1,10 @@
+
+services:
+  app:
+    image: python3.12:dev
+    container_name: python-devcontainer
+    command: sleep infinity
+    volumes:
+      - ..:/workspace
+    ports:
+      - "10001:8000"
