@@ -22,7 +22,7 @@
       ],
       "settings": {
         "terminal.integrated.shell.linux": "/bin/bash",
-        "python.defaultInterpreterPath": "/usr/local/bin/python"
+        "python.defaultInterpreterPath": "/app/bin/python"
       }
     }
   }
