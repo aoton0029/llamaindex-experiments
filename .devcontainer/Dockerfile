@@ -1,14 +1,21 @@
-FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim
 
-WORKDIR /workspace
+WORKDIR /app
 
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		build-essential \
-		git \
-		wget \
-	&& python -m pip install --upgrade pip setuptools wheel \
-	&& rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
+    gcc \
+    wget \
+    build-essential \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY ./requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY requirements.txt .
+COPY download_packages.py .
+RUN uv venv .venv
+RUN uv pip sync requirements.txt
+RUN uv run ./download_packages.py
+
+ENV TIKTOKEN_CACHE_DIR=/root/.cache/tiktoken
