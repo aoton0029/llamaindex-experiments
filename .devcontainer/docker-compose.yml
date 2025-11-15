@@ -1,10 +1,10 @@
 services:
   app:
-    image: python:3.12:dev
+    image: python3.12:dev
     container_name: ${CONTAINER_NAME}
     ports:
       - "${HOST_PORT}:8000"
     volumes:
-      - .:/workspace
+      - ..:/workspace
     working_dir: /workspace
     command: sleep infinity

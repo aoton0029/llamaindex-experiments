@@ -21,7 +21,7 @@ from factories import (
     BaseChunker, 
     SchemaBuilder,
     IndexBuilder,
-    DatasetFactory, 
+    , 
     EvaluatorFactory
 )
 from transformers import AutoTokenizer
@@ -329,7 +329,7 @@ class ExperimentRunner:
                     raise ValueError("Dataset path is required when source is 'file'")
                 
                 self.monitor.log_event("evaluation", f"Loading dataset from file: {dataset_path}")
-                dataset = DatasetFactory.load_dataset_from_file(
+                dataset = LlamaIndexDatasetFactory.load_dataset_from_file(
                     file_path=dataset_path,
                     format=dataset_config.get('format', 'json')
                 )
@@ -341,7 +341,7 @@ class ExperimentRunner:
                     raise ValueError("Dataset name is required when source is 'huggingface'")
                 
                 self.monitor.log_event("evaluation", f"Loading dataset from HuggingFace: {dataset_name}")
-                dataset = DatasetFactory.load_huggingface_dataset(
+                dataset = LlamaIndexDatasetFactory.load_huggingface_dataset(
                     dataset_name=dataset_name,
                     split=dataset_config.get('split', 'train'),
                     query_field=dataset_config.get('query_field', 'query'),
@@ -357,7 +357,7 @@ class ExperimentRunner:
                 dataset_save_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 # データセット自動生成
-                dataset = DatasetFactory.auto_generate_dataset(
+                dataset = LlamaIndexDatasetFactory.auto_generate_dataset(
                     documents=documents,
                     num_questions=testset_size,
                     num_questions_per_chunk=dataset_config.get('questions_per_chunk', 2),

@@ -20,11 +20,11 @@ langchain
 langchain-text-splitters
 langchain-community
 langchain-core
-langsmith
 langchain-cli
 langchain-ollama
 langchain-milvus
 langchain-mongodb
+langsmith
 llama-index
 llama-index-core
 llama-index-experimental
@@ -97,4 +97,3 @@ evaluate
 bert-score
 rouge-score
 tqdm
-omnilingual-asr
