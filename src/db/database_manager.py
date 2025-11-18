@@ -6,6 +6,8 @@
 import logging
 from typing import Optional, Dict, Any, Union
 from dataclasses import dataclass
+from pymilvus import CollectionSchema
+
 from llama_index.core.storage.storage_context import StorageContext
 from llama_index.core.storage.docstore.types import BaseDocumentStore
 from llama_index.core.storage.index_store.types import BaseIndexStore
@@ -24,37 +26,39 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DatabaseConfig:
     """データベース設定クラス"""
+    username: str = "admin"
+    password: str = "pdntsPa0"
+    
     # MongoDB設定
-    mongodb_host: str = "localhost"
+    mongodb_base_url: str = "mongodb://admin:pdntsPa0@mongodb:27017"
+    mongodb_host: str = "mongodb"
     mongodb_port: int = 27017
-    mongodb_database: str = "rag_system"
-    mongodb_username: Optional[str] = None
-    mongodb_password: Optional[str] = None
+    mongodb_database: str = "pdf_rag_system"
+    mongodb_username: Optional[str] = username
+    mongodb_password: Optional[str] = password
     
     # Redis設定
-    redis_host: str = "localhost"
+    redis_host: str = "redis"
     redis_port: int = 6379
-    redis_password: Optional[str] = None
+    redis_password: Optional[str] = password
     redis_db: int = 0
     
     # Milvus設定
-    milvus_host: str = "localhost"
+    milvus_host: str = "milvus"
     milvus_port: int = 19530
-    milvus_user: Optional[str] = None
-    milvus_password: Optional[str] = None
-    milvus_collection: str = "rag_vectors"
-    milvus_dim: int = 1536
+    milvus_user: Optional[str] = username
+    milvus_password: Optional[str] = password
     
     # Neo4j設定
-    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_uri: str = "bolt://neo4j:7687"
     neo4j_username: str = "neo4j"
-    neo4j_password: str = "password"
+    neo4j_password: str = password
     neo4j_database: str = "neo4j"
 
 
 class DatabaseManager:    
-    def __init__(self, config: DatabaseConfig):
-        self.config = config
+    def __init__(self, config: Optional[DatabaseConfig] = None):
+        self.config = config or DatabaseConfig()
         
         # クライアントインスタンス
         self._mongodb_client: Optional[MongoDBClient] = None
@@ -66,13 +70,55 @@ class DatabaseManager:
         self._docstore: Optional[BaseDocumentStore] = None
         self._index_store: Optional[BaseIndexStore] = None
         self._vector_store: Optional[VectorStore] = None
+        self._image_store: Optional[VectorStore] = None
         self._graph_store: Optional[GraphStore] = None
         self._storage_context: Optional[StorageContext] = None
     
+        self.milvus_vector_dim: int = None 
+        self.milvus_image_dim: int = None
+        self.milvus_vector_collection_name: str = None
+        self.milvus_image_collection_name: str = None
+        
     @classmethod
     def from_config_dict(cls, config_dict: Dict[str, Any]) -> 'DatabaseManager':
         config = DatabaseConfig(**config_dict)
         return cls(config)
+    
+    def initialize(
+            self, 
+            milvus_vector_collection_name: str,
+            milvus_image_collection_name: str,
+            milvus_vector_collection_schema: CollectionSchema,
+            milvus_image_collection_schema: CollectionSchema,
+            milvus_vector_dim: int,
+            milvus_image_dim: int,
+            mongodb_namespace: str,
+            index_namespace: str,
+            recreate_collection: bool = False, 
+        ):        
+        self.disconnect_all()
+        self.connect_all()
+        # Mivusコレクション初期化
+        milvus = self.get_milvus_client()
+        milvus.create_collection(
+            milvus_vector_collection_name, 
+            milvus_vector_dim,
+            milvus_vector_collection_schema)
+        milvus.create_collection(
+            milvus_image_collection_name,
+            milvus_image_dim,
+            milvus_image_collection_schema
+        )
+        
+        # データ初期化
+        if recreate_collection:
+            self.drop_all_collections(
+                milvus_vector_collection_name=milvus_vector_collection_name,
+                milvus_image_collection_name=milvus_image_collection_name,
+                mongodb_namespace=mongodb_namespace,
+                index_namespace=index_namespace
+            )
+            self.connect_all()
     
     def get_mongodb_client(self) -> MongoDBClient:
         """MongoDBクライアントを取得"""
@@ -104,9 +150,7 @@ class DatabaseManager:
                 host=self.config.milvus_host,
                 port=self.config.milvus_port,
                 user=self.config.milvus_user,
-                password=self.config.milvus_password,
-                collection_name=self.config.milvus_collection,
-                dim=self.config.milvus_dim
+                password=self.config.milvus_password
             )
         return self._milvus_client
     
@@ -150,16 +194,34 @@ class DatabaseManager:
     def get_vector_store(
         self,
         collection_name: Optional[str] = None,
+        dim: Optional[int] = None,
         **kwargs
     ) -> VectorStore:
         if self._vector_store is None:
             milvus_client = self.get_milvus_client()
             self._vector_store = milvus_client.get_vector_store(
-                collection_name=collection_name,
+                collection_name=collection_name or self.milvus_vector_collection_name,
+                dim=dim or self.milvus_vector_dim,
                 **kwargs
             )
         return self._vector_store
+
+    def get_image_store(
+        self,
+        collection_name: Optional[str] = None,
+        dim: Optional[int] = None,
+        **kwargs
+    ) -> VectorStore:
+        if self._image_store is None:
+            milvus_client = self.get_milvus_client()
+            self._image_store = milvus_client.get_vector_store(
+                collection_name=collection_name or self.milvus_image_collection_name,
+                dim=dim or self.milvus_image_dim,
+                **kwargs
+            )
+        return self._image_store
     
+
     def get_graph_store(
         self,
         node_label: str = "Entity",
@@ -180,6 +242,7 @@ class DatabaseManager:
         docstore_namespace: str,
         index_namespace: str,
         vector_collection: str,
+        image_collection: str,
         graph_node_label: str = "Entity",
         graph_rel_type: str = "RELATED"
     ) -> StorageContext:
@@ -190,6 +253,7 @@ class DatabaseManager:
             docstore_namespace: ドキュメントストアの名前空間
             index_namespace: インデックスストアの名前空間
             vector_collection: ベクトルストアのコレクション名
+            image_collection: 画像ストアのコレクション名
             graph_node_label: グラフストアのノードラベル
             graph_rel_type: グラフストアのリレーションシップタイプ
             
@@ -199,8 +263,9 @@ class DatabaseManager:
         if self._storage_context is None:
             self._storage_context = StorageContext.from_defaults(
                 docstore=self.get_docstore(namespace=docstore_namespace),
-                index_store=self.get_index_store(namespace=index_namespace),
+                index_store=self.get_index_store(namespace=index_namespace, collection_suffix="index"),
                 vector_store=self.get_vector_store(collection_name=vector_collection),
+                image_store=self.get_image_store(collection_name=image_collection),
                 graph_store=self.get_graph_store(
                     node_label=graph_node_label,
                     rel_type=graph_rel_type
@@ -249,6 +314,7 @@ class DatabaseManager:
         self._docstore = None
         self._index_store = None
         self._vector_store = None
+        self._image_store = None
         self._graph_store = None
         self._storage_context = None
         
@@ -283,19 +349,7 @@ class DatabaseManager:
             health_status["neo4j"] = False
         
         return health_status
-    
-    def reset_all(self) -> None:
-        """全データベースのリセット"""
-        if self._mongodb_client:
-            self._mongodb_client.reset()
-        if self._redis_client:
-            self._redis_client.reset()
-        if self._milvus_client:
-            self._milvus_client.reset()
-        if self._neo4j_client:
-            self._neo4j_client.reset()
-        
-        logger.info("全データベースをリセットしました")
+
     
     def __enter__(self):
         """コンテキストマネージャーのエントリ"""
@@ -305,3 +359,24 @@ class DatabaseManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """コンテキストマネージャーの終了"""
         self.disconnect_all()
+
+    def drop_all_collections(self, 
+                             milvus_vector_collection_name: str,
+                             milvus_image_collection_name: str, 
+                             mongodb_namespace: str,
+                             index_namespace: str) -> None:
+        """全データベースのコレクションを削除"""
+        if self._mongodb_client:
+            self._mongodb_client.drop_collection(f"{mongodb_namespace}/data")
+            self._mongodb_client.drop_collection(f"{mongodb_namespace}/metadata")
+            self._mongodb_client.drop_collection(f"{mongodb_namespace}/ref_doc_info")
+
+        if self._redis_client:
+            self._redis_client.delete_key(index_namespace)
+        
+        if self._milvus_client:
+            self._milvus_client.drop_collection(milvus_vector_collection_name)
+            self._milvus_client.drop_collection(milvus_image_collection_name)
+        
+        if self._neo4j_client:
+            self._neo4j_client.clear_database()

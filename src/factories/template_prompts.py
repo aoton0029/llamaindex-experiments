@@ -45,7 +45,7 @@ TEXT_QA_PROMPT_TMPL_MSGS = [
 
 CHAT_TEXT_QA_PROMPT = ChatPromptTemplate(message_templates=TEXT_QA_PROMPT_TMPL_MSGS)
 
-DEFAULT_TEXT_QA_PROMPT_TMPL = (
+JP_TEXT_QA_PROMPT_TMPL = (
     "以下にコンテキスト情報を示します。\n"
     "---------------------\n"
     "{context_str}\n"
@@ -54,12 +54,12 @@ DEFAULT_TEXT_QA_PROMPT_TMPL = (
     "質問: {query_str}\n"
     "回答: "
 )
-DEFAULT_TEXT_QA_PROMPT = PromptTemplate(
-    DEFAULT_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
+JP_TEXT_QA_PROMPT = PromptTemplate(
+    JP_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
 )
 default_text_qa_conditionals = [(is_chat_model, CHAT_TEXT_QA_PROMPT)]
 DEFAULT_TEXT_QA_PROMPT_SEL = SelectorPromptTemplate(
-    default_template=DEFAULT_TEXT_QA_PROMPT,
+    default_template=JP_TEXT_QA_PROMPT,
     conditionals=default_text_qa_conditionals,
 )
 
@@ -237,32 +237,65 @@ DEFAULT_QUESTION_GEN_TMPL = """\
 ###############################################################
 # Evaluation Prompt Templates
 ###############################################################
-DEFAULT_TEXT_QA_PROMPT_TMPL = (
-    "以下にコンテキスト情報があります。\n"
+JP_TEXT_QA_PROMPT_TMPL = (
+    "コンテキスト情報は以下の通りです。\n"
     "---------------------\n"
     "{context_str}\n"
-    "---------------------\n"
-    "コンテキストの情報のみを用い、事前知識を参照せずに質問に答えてください。\n"
+    "---------------------\n\n"
+    "上記のコンテキスト情報を使用して、以下の質問に答えてください。\n"
+    "回答する際の注意事項:\n"
+    "- コンテキストに基づいた正確な回答をしてください\n"
+    "- コンテキストに情報がない場合は「提供された情報からは回答できません」と答えてください\n"
+    "- 回答は簡潔かつ明確にしてください\n"
+    "- 自然な日本語で回答してください\n\n"
     "質問: {query_str}\n"
     "回答: "
 )
 
-DEFAULT_TEXT_QA_PROMPT = PromptTemplate(
-    DEFAULT_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
+JP_TEXT_QA_PROMPT = PromptTemplate(
+    JP_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
 )
 
-DEFAULT_QUESTION_GENERATION_PROMPT = """\
-以下にコンテキスト情報があります。
----------------------
-{context_str}
----------------------
-以下のクエリに基づき、関連する質問のみを生成してください（外部知識は用いないでください）。
-{query_str}
-"""
+JP_QUESTION_GENERATION_PROMPT = (
+    "コンテキスト情報は以下の通りです。\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n\n"
+    "上記のコンテキスト情報のみを基に、質問を生成してください\n\n"
+    "## 質問を生成する際の注意事項\n"
+    "1. 質問はコンテキストから直接回答できるものにしてください。\n"
+    "2. 質問は具体的で明確なものにしてください\n"
+    "3. 質問は以下のような多様性を持たせてください\n"
+    "   1. 事実確認の質問（「～は何ですか？」「～はいつですか？」）\n"
+    "   2. 理由・説明の質問（「なぜ～ですか？」「どのように～ですか？」）\n"
+    "   3. 比較の質問（「～と～の違いは何ですか？」）\n"
+    "   4. 評価の質問（「～の利点は何ですか？」）\n\n"
+    "4. 各質問は独立した行に記述してください\n"
+    "5. 質問文は自然な日本語で記述してください\n\n"
+    "質問:{query_str}"
+)
 
-QUESTION_GEN_QUERY = "与えられたドキュメントに基づいて、関連する質問を生成してください。"
 
-DEFAULT_EVAL_TEMPLATE = PromptTemplate(
+JP_QUESTION_GEN_QUERY = (
+    "あなたはテストデータセット生成のための教師です。\n"
+    "与えられた文書から、理解度を測るための{num_questions_per_chunk}個の質問を生成してください。\n"
+    "## 質問は以下の要件を満たす必要があります\n"
+    "- コンテキストに含まれる具体的な情報に基づいていること\n"
+    "- コンテキストから直接回答できる質問であること\n"
+    "- 明確で曖昧さのない表現を使用すること\n"
+    "- コンテキストに記載されていない外部知識を必要としないこと\n"
+    "- 以下のような多様な観点からの質問を含めること\n"
+    "   1. 事実確認の質問（「～は何ですか？」「～はいつですか？」）\n"
+    "   2. 理由・説明の質問（「なぜ～ですか？」「どのように～ですか？」）\n"
+    "   3. 比較の質問（「～と～の違いは何ですか？」）\n"
+    "   4. 評価の質問（「～の利点は何ですか？」）\n\n"
+    "## 質問は必ず以下の形式で出力してください\n"
+    "1. [質問文]\n"
+    "2. [質問文]\n"
+    "3. [質問文]\n"
+)
+
+JP_EVAL_TEMPLATE = PromptTemplate(
     "以下の情報がコンテキストによって支持されているかどうかを判断してください。\n"
     "回答は必ず YES または NO のいずれかで行ってください。\n"
     "たとえ大部分のコンテキストが無関係であっても、コンテキストのいずれかの部分が情報を支持していれば YES と答えてください。\n"
@@ -282,7 +315,7 @@ DEFAULT_EVAL_TEMPLATE = PromptTemplate(
     "回答: "
 )
 
-DEFAULT_REFINE_TEMPLATE = PromptTemplate(
+JP_REFINE_TEMPLATE = PromptTemplate(
     "次の情報がコンテキストに含まれているか確認してください: {query_str}\n"
     "既に YES/NO の回答があります: {existing_answer}\n"
     "以下の追加コンテキストを使って、必要なら既存の回答を修正してください。\n"

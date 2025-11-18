@@ -13,7 +13,6 @@ from llama_index.core.node_parser import (
 from llama_index.core.text_splitter import TokenTextSplitter
 
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -162,4 +161,5 @@ class ChunkerFactory:
         else:
             raise ValueError(f"未知のチャンカータイプ: {chunker_type}")
         
+
 

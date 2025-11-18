@@ -16,102 +16,101 @@ from llama_index.core.selectors import (
     LLMSingleSelector,
     LLMMultiSelector,
 )
-from llama_index.core.tools import QueryEngineTool
+from llama_index.core.tools import QueryEngineTool, RetrieverTool
 from llama_index.core.indices.base import BaseIndex
-from factories.response_synthesizer_service import ResponseSynthesizerFactory, ResponseMode
 
+from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
+from .template_prompts import *
 
 logger = logging.getLogger(__name__)
 
 
 class QueryEngineFactory:
     @staticmethod
-    def create(query_engine_type: str) -> BaseQueryEngine:
+    def create(query_engine_type: str, **kwargs) -> BaseQueryEngine:
         if query_engine_type == "retriever":
-            return RetrieverQueryEngine()
+            return QueryEngineFactory.create_retriever_query_engine(**kwargs)
         elif query_engine_type == "router":
-            return RouterQueryEngine()
+            return QueryEngineFactory.create_router_query_engine(**kwargs)
         elif query_engine_type == "retry":
-            return RetryQueryEngine()
+            return QueryEngineFactory.create_retry_query_engine(**kwargs)
         elif query_engine_type == "multi_step":
-            return MultiStepQueryEngine()
+            return QueryEngineFactory.create_multi_step_query_engine(**kwargs)
         elif query_engine_type == "transform":
-            return TransformQueryEngine()
-        elif query_engine_type == "retry_source":
-            return RetrySourceQueryEngine()
+            return QueryEngineFactory.create_transform_query_engine(**kwargs)
         else:
             raise ValueError(f"未知のクエリエンジンタイプ: {query_engine_type}")
     
+    @staticmethod
     def create_retriever_query_engine(
-        self,
         index: BaseIndex,
         retriever: BaseRetriever,
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
-        **kwargs
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RetrieverQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RetrieverQueryEngine(
             index=index,
             retriever=retriever,
             response_synthesizer=response_synthesizer
         )
     
+    @staticmethod
     def create_router_query_engine(
-        self,
         selector_type: str,
         query_engine_tools: Sequence[QueryEngineTool],
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RouterQueryEngine:
         selector = SelectorFactory.create(selector_type=selector_type)
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=query_engine_tools,
             response_synthesizer=response_synthesizer
         )
     
+    @staticmethod
     def create_router_query_engine(
-        self,
         selector_type: str,
         indices: List[Tuple[BaseIndex, str, str]],
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RouterQueryEngine:
         selector = SelectorFactory.create(selector_type=selector_type)
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=[ToolFactory.create_query_engine_tool(idx.as_query_engine(), name, desc) for idx, name, desc in indices],
             response_synthesizer=response_synthesizer
         )
 
+    @staticmethod
     def create_retry_query_engine(
-        self,
         query_engine: BaseQueryEngine,
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RetryQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RetryQueryEngine(
             query_engine=query_engine,
             response_synthesizer=response_synthesizer
         )
     
+    
+    @staticmethod
     def create_multi_step_query_engine(
-        self,
         query_engines: List[BaseQueryEngine],
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> MultiStepQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return MultiStepQueryEngine(
             query_engines=query_engines,
             response_synthesizer=response_synthesizer
         )
     
+    @staticmethod
     def create_transform_query_engine(
-        self,
         query_engine: BaseQueryEngine,
-        response_mode: ResponseMode = ResponseMode.DEFAULT,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> TransformQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.create(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return TransformQueryEngine(
             query_engine=query_engine,
             response_synthesizer=response_synthesizer
@@ -152,7 +151,6 @@ class ToolFactory:
 
 class SelectorFactory:
 
-
     @staticmethod
     def create(selector_type:str):
         if selector_type == "llm_single":
@@ -166,7 +164,7 @@ class SelectorFactory:
     def create_llm_single_selector():
         try:
             selector = LLMSingleSelector.from_defaults(
-                prompt_template_str=SelectorFactory.DEFAULT_SINGLE_SELECT_PROMPT_TMPL
+                prompt_template_str=DEFAULT_SINGLE_SELECT_PROMPT_TMPL
             )
             logger.info("LLMSingleSelectorを作成")
             return selector
@@ -178,7 +176,7 @@ class SelectorFactory:
     def create_llm_multi_selector():
         try:
             selector = LLMMultiSelector.from_defaults(
-                prompt_template_str=SelectorFactory.DEFAULT_MULTI_SELECT_PROMPT_TMPL
+                prompt_template_str=DEFAULT_MULTI_SELECT_PROMPT_TMPL
             )
             logger.info("LLMMultiSelectorを作成")
             return selector
