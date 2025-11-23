@@ -10,7 +10,7 @@ from llama_index.core import Settings, StorageContext
 
 logger = logging.getLogger(__name__)
 
-class ExperimentMetrics(BaseModel):
+class TestMetrics(BaseModel):
     """実験メトリクス"""
     chunking_time: float = 0.0
     indexing_time: float = 0.0
@@ -21,7 +21,7 @@ class ExperimentMetrics(BaseModel):
     llm_tokens_used: Optional[int] = None
     embedding_tokens_used: Optional[int] = None
 
-class ExperimentMonitor:
+class TestMonitor:
     """実験のモニタリングと記録を管理"""
     
     def __init__(self, result_dir: str):
@@ -29,11 +29,11 @@ class ExperimentMonitor:
         self.result_dir.mkdir(parents=True, exist_ok=True)
         self.current_experiment_id: Optional[str] = None
         self.current_experiment_dir: Optional[Path] = None
-        self.metrics = ExperimentMetrics()
+        self.metrics = TestMetrics()
         self.start_time: Optional[datetime] = None
         self.logs: List[Dict[str, Any]] = []
     
-    def start_experiment(self, experiment_name: str, config: Dict[str, Any]) -> str:
+    def start_test(self, experiment_name: str, config: Dict[str, Any]) -> str:
         """
         実験を開始し、ディレクトリ構造を作成
         
@@ -87,7 +87,7 @@ class ExperimentMonitor:
             if hasattr(self.metrics, key):
                 setattr(self.metrics, key, value)
     
-    def end_experiment(self, success: bool, result_data: Dict[str, Any]):
+    def end_test(self, success: bool, result_data: Dict[str, Any]):
         """
         実験を終了し、最終結果を保存
         
@@ -195,7 +195,7 @@ class ExperimentMonitor:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     
-    def get_experiment_dir(self) -> Path:
+    def get_test_dir(self) -> Path:
         """現在の実験ディレクトリを取得"""
         return self.current_experiment_dir
 

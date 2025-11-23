@@ -1,0 +1,14 @@
+
+tokenizer_types:
+  huggingface_qwen:
+    type: "huggingface"
+    model_name: "Qwn3/Qwen3-32B" 
+    kwargs:
+      pretrained_model_name_or_path: "models/Qwen3/Qwen3-32B"
+
+  huggingface_ruri_v3_310m:
+    type: "huggingface"
+    model_name: "cl-nagoya/ruri-v3-310m"
+    kwargs:
+      pretrained_model_name_or_path: "models/Ruri/Ruri-V3-310M"
+

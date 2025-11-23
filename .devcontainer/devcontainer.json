@@ -21,7 +21,6 @@
         "donjayamanne.python-environment-manager"
       ],
       "settings": {
-        "terminal.integrated.shell.linux": "/bin/bash",
         "python.defaultInterpreterPath": "/app/.venv/bin/python"
       }
     }

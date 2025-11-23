@@ -1,38 +1,158 @@
-from typing import List
 import logging
+from typing import List, Optional, Sequence
 from llama_index.core.schema import Document, BaseNode
-from llama_index.core.ingestion import IngestionPipeline
+from llama_index.core.program import LLMTextCompletionProgram
+from llama_index.core.bridge.pydantic import PrivateAttr
 from llama_index.core.extractors import (
+    BaseExtractor,
     TitleExtractor,
     KeywordExtractor,
     SummaryExtractor,
-    QuestionsAnsweredExtractor
+    QuestionsAnsweredExtractor,
+    DocumentContextExtractor,
+    PydanticProgramExtractor
 )
-from .template_prompts import *
+from .template_prompts import TemplatePromptSettings
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+# Pydanticモデル定義
+class TitleOutput(BaseModel):
+    """タイトル抽出の出力モデル"""
+    title: str = Field(description="ドキュメントのタイトル（簡潔で内容を表すもの）")
+
+
+class SummaryOutput(BaseModel):
+    """要約抽出の出力モデル"""
+    summary: str = Field(description="ドキュメントの要約（200文字程度）")
+
+
+class KeywordOutput(BaseModel):
+    """キーワード抽出の出力モデル"""
+    keywords: List[str] = Field(description="ドキュメントの主要キーワードリスト（最大10個）")
+
+
+# 構造化Extractorクラス
+class StructuredTitleExtractor(BaseExtractor):
+    """Pydanticモデルを使用した構造化タイトル抽出"""
+    
+    _program: LLMTextCompletionProgram = PrivateAttr()
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._program = LLMTextCompletionProgram.from_defaults(
+            output_cls=TitleOutput,
+            prompt_template_str=TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
+            verbose=True
+        )
+    
+    async def aextract(self, nodes: Sequence[BaseNode]) -> List[dict]:
+        """非同期でタイトルを抽出"""
+        metadata_list = []
+        
+        for node in nodes:
+            try:
+                result = await self._program.acall(context_str=node.get_content())
+                metadata = {"document_title": result.title}
+                logger.info(f"タイトル抽出成功: {result.title}")
+            except Exception as e:
+                logger.error(f"タイトル抽出エラー: {e}")
+                metadata = {"document_title": ""}
+            metadata_list.append(metadata)
+
+        return metadata_list
+
+
+class StructuredSummaryExtractor(BaseExtractor):
+    """Pydanticモデルを使用した構造化要約抽出"""
+    
+    _program: LLMTextCompletionProgram = PrivateAttr()
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)        
+        self._program = LLMTextCompletionProgram.from_defaults(
+            output_cls=SummaryOutput,
+            prompt_template_str=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE,
+            verbose=True
+        )
+    
+    async def aextract(self, nodes: Sequence[BaseNode]) -> List[dict]:
+        """非同期で要約を抽出"""
+        metadata_list = []
+        
+        for node in nodes:
+            try:
+                result = await self._program.acall(context_str=node.get_content())
+                metadata = {"section_summary": result.summary}
+                logger.info(f"要約抽出成功: {result.summary[:50]}...")
+            except Exception as e:
+                logger.error(f"要約抽出エラー: {e}")
+                metadata = {"section_summary": ""}
+            
+            metadata_list.append(metadata)
+        
+        return metadata_list
+
+
+class StructuredKeywordExtractor(BaseExtractor):
+    """Pydanticモデルを使用した構造化キーワード抽出"""
+    
+    _program: LLMTextCompletionProgram = PrivateAttr()
+    
+    def __init__(self, max_keywords: int = 10, **kwargs):
+        super().__init__(**kwargs)
+        self._program = LLMTextCompletionProgram.from_defaults(
+            output_cls=KeywordOutput,
+            prompt_template_str=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL.format(max_keywords=max_keywords),
+            verbose=True
+        )
+
+    async def aextract(self, nodes: Sequence[BaseNode]) -> List[dict]:
+        """非同期でキーワードを抽出"""
+        metadata_list = []
+        
+        for node in nodes:
+            try:
+                result = await self._program.acall(context_str=node.get_content())
+                metadata = {"excerpt_keywords": ", ".join(result.keywords)}
+                logger.info(f"キーワード抽出成功: {result.keywords}")
+            except Exception as e:
+                logger.error(f"キーワード抽出エラー: {e}")
+                metadata = {"excerpt_keywords": ""}
+            
+            metadata_list.append(metadata)
+        
+        return metadata_list
+
 
 class ExtractorFactory:
     @staticmethod
     def create_extractor(extractor_type: str, **kwargs):
-        if extractor_type == "title":
-            return ExtractorFactory.create_title_extractor(**kwargs)
-        elif extractor_type == "keyword":
-            return ExtractorFactory.create_keyword_extractor(**kwargs)
-        elif extractor_type == "summary":
-            return ExtractorFactory.create_summary_extractor(**kwargs)
-        elif extractor_type == "questions_answered":
-            return ExtractorFactory.create_questions_answered_extractor(**kwargs)
+        extractors = {
+            "title": ExtractorFactory._create_title_extractor,
+            "summary": ExtractorFactory._create_summary_extractor,
+            "keyword": ExtractorFactory._create_keyword_extractor,
+            "questions_answered": ExtractorFactory._create_questions_answered_extractor,
+            "document_context": ExtractorFactory._create_document_context_extractor,
+            "pydantic_program": ExtractorFactory._create_pydantic_program_extractor,
+            "structured_title": ExtractorFactory._create_structured_title_extractor,
+            "structured_summary": ExtractorFactory._create_structured_summary_extractor,
+            "structured_keyword": ExtractorFactory._create_structured_keyword_extractor,
+        }
+        if extractor_type in extractors:
+            return extractors[extractor_type](**kwargs)
         else:
             raise ValueError(f"未知のエクストラクタータイプ: {extractor_type}")
     
     @staticmethod
-    def create_title_extractor(nodes: int = 5):
+    def _create_title_extractor(nodes: int = 5):
         try:
             extractor = TitleExtractor(
                 nodes = nodes,
-                default_title_node_template = DEFAULT_TITLE_NODE_TEMPLATE,
-                default_title_combine_template = DEFAULT_TITLE_COMBINE_TEMPLATE
+                default_title_node_template = TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
+                default_title_combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TEMPLATE
             )
             logger.info("TitleExtractorを作成")
             return extractor
@@ -41,10 +161,10 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def create_summary_extractor():
+    def _create_summary_extractor():
         try:
             extractor = SummaryExtractor(
-                prompt_template=DEFAULT_SUMMARY_EXTRACT_TEMPLATE
+                prompt_template=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE
             )
             logger.info("SummaryExtractorを作成")
             return extractor
@@ -53,10 +173,11 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def create_keyword_extractor():
+    def _create_keyword_extractor(keywords: int = 10):
         try:
             extractor = KeywordExtractor(
-                prompt_template=DEFAULT_KEYWORD_EXTRACT_TEMPLATE
+                prompt_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
+                keywords=keywords
             )
             logger.info("KeywordExtractorを作成")
             return extractor
@@ -65,14 +186,70 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def create_questions_answered_extractor(questions: int = 5):
+    def _create_questions_answered_extractor(questions: int = 5):
         try:
             extractor = QuestionsAnsweredExtractor(
                 questions=questions,
-                prompt_template=DEFAULT_QUESTION_GEN_TMPL
+                prompt_template=TemplatePromptSettings.JP_QUESTION_GEN_TMPL
             )
             logger.info("QuestionsAnsweredExtractorを作成")
             return extractor
         except Exception as e:
             logger.error(f"QuestionsAnsweredExtractor作成エラー: {e}")
+            raise
+    
+    @staticmethod
+    def _create_document_context_extractor(context_str: str = ""):
+        try:
+            extractor = DocumentContextExtractor(
+                context_str=context_str
+            )
+            logger.info("DocumentContextExtractorを作成")
+            return extractor
+        except Exception as e:
+            logger.error(f"DocumentContextExtractor作成エラー: {e}")
+            raise
+    
+    @staticmethod
+    def _create_pydantic_program_extractor(program, input_key: str = "input", **kwargs):
+        try:
+            extractor = PydanticProgramExtractor(
+                program=program,
+                input_key=input_key,
+                **kwargs
+            )
+            logger.info("PydanticProgramExtractorを作成")
+            return extractor
+        except Exception as e:
+            logger.error(f"PydanticProgramExtractor作成エラー: {e}")
+            raise
+    
+    @staticmethod
+    def _create_structured_title_extractor(**kwargs) -> StructuredTitleExtractor:
+        try:
+            extractor = StructuredTitleExtractor(**kwargs)
+            logger.info("StructuredTitleExtractorを作成")
+            return extractor
+        except Exception as e:
+            logger.error(f"StructuredTitleExtractor作成エラー: {e}")
+            raise
+    
+    @staticmethod
+    def _create_structured_summary_extractor(**kwargs) -> StructuredSummaryExtractor:
+        try:
+            extractor = StructuredSummaryExtractor(**kwargs)
+            logger.info("StructuredSummaryExtractorを作成")
+            return extractor
+        except Exception as e:
+            logger.error(f"StructuredSummaryExtractor作成エラー: {e}")
+            raise
+    
+    @staticmethod
+    def _create_structured_keyword_extractor(**kwargs) -> StructuredKeywordExtractor:
+        try:
+            extractor = StructuredKeywordExtractor(**kwargs)
+            logger.info("StructuredKeywordExtractorを作成")
+            return extractor
+        except Exception as e:
+            logger.error(f"StructuredKeywordExtractor作成エラー: {e}")
             raise

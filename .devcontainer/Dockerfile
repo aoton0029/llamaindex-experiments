@@ -6,7 +6,6 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y \
     gcc \
     wget \
-    build-essential \
     git \
     curl \
     ca-certificates \
@@ -15,7 +14,7 @@ RUN apt-get update && apt-get upgrade -y && \
 COPY requirements.txt .
 # COPY download_packages.py .
 RUN uv venv .venv
-RUN uv pip sync requirements.txt
+RUN uv pip install -r requirements.txt
 # RUN uv run ./download_packages.py
 
 ENV TIKTOKEN_CACHE_DIR=/root/.cache/tiktoken

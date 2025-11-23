@@ -15,7 +15,12 @@ from llama_index.core.storage.docstore.types import BaseDocumentStore
 logger = logging.getLogger(__name__)
 
 
-class MongoDBClient:    
+class MongoDBClient:
+    """
+    MongoDBクライアントクラス
+    llama_index MongoDocumentStoreのラッパー
+    """
+    
     def __init__(
         self, 
         database_name: str,
@@ -26,6 +31,18 @@ class MongoDBClient:
         auth_source: str = "admin",
         **kwargs
     ):
+        """
+        MongoDBクライアントの初期化
+        
+        Args:
+            host: MongoDBホスト
+            port: MongoDBポート
+            database_name: データベース名
+            username: ユーザー名
+            password: パスワード
+            auth_source: 認証データベース
+            **kwargs: その他のMongoDB接続パラメータ
+        """
         self.host = host
         self.port = port
         self.database_name = database_name
@@ -39,6 +56,7 @@ class MongoDBClient:
         self._docstore: Optional[MongoDocumentStore] = None
     
     def connect(self) -> None:
+        """MongoDB接続を確立"""
         try:
             # 接続URI構築
             if self.username and self.password:
@@ -58,6 +76,7 @@ class MongoDBClient:
             raise
     
     def disconnect(self) -> None:
+        """MongoDB接続を切断"""
         if self._client:
             self._client.close()
             self._client = None
@@ -66,16 +85,19 @@ class MongoDBClient:
             logger.info("MongoDB接続を切断しました")
     
     def get_client(self) -> MongoClient:
+        """MongoClientを取得"""
         if self._client is None:
             self.connect()
         return self._client
     
     def get_database(self) -> Database:
+        """Databaseを取得"""
         if self._database is None:
             self.connect()
         return self._database
     
     def get_collection(self, collection_name: str) -> Collection:
+        """指定されたコレクションを取得"""
         database = self.get_database()
         return database[collection_name]
     
@@ -84,6 +106,16 @@ class MongoDBClient:
         namespace: str = "default",
         collection_name: str = "documents"
     ) -> BaseDocumentStore:
+        """
+        llama_index MongoDocumentStoreを取得
+        
+        Args:
+            namespace: ドキュメントの名前空間
+            collection_name: コレクション名
+            
+        Returns:
+            MongoDocumentStore インスタンス
+        """
         if self._docstore is None:
             # MongoDB URIを構築
             if self.username and self.password:
@@ -105,19 +137,33 @@ class MongoDBClient:
         index_spec: Dict[str, Any],
         index_options: Optional[Dict[str, Any]] = None
     ) -> str:
+        """
+        インデックスを作成
+        
+        Args:
+            collection_name: コレクション名
+            index_spec: インデックス仕様
+            index_options: インデックスオプション
+            
+        Returns:
+            作成されたインデックス名
+        """
         collection = self.get_collection(collection_name)
         return collection.create_index(index_spec, **(index_options or {}))
     
     def drop_collection(self, collection_name: str) -> None:
+        """コレクションを削除"""
         database = self.get_database()
         database.drop_collection(collection_name)
         logger.info(f"コレクション '{collection_name}' を削除しました")
     
     def get_collection_stats(self, collection_name: str) -> Dict[str, Any]:
+        """コレクションの統計情報を取得"""
         database = self.get_database()
         return database.command("collStats", collection_name)
     
     def health_check(self) -> bool:
+        """ヘルスチェック"""
         try:
             client = self.get_client()
             client.admin.command('ping')
@@ -127,14 +173,10 @@ class MongoDBClient:
             return False
     
     def __enter__(self):
+        """コンテキストマネージャーのエントリ"""
         self.connect()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """コンテキストマネージャーの終了"""
         self.disconnect()
-    
-    def reset(self, collection_name: str) -> None:
-        """指定したコレクションを削除して再作成"""
-        self.drop_collection(collection_name)
-        logger.info(f"コレクション '{collection_name}' をリセットしました")
-        self.get_collection(collection_name)

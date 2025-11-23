@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class RedisClient:
+    """
+    Redisクライアントクラス
+    llama_index RedisIndexStoreのラッパー
+    """
+    
     def __init__(
         self,
         host: str = "localhost",
@@ -27,6 +32,20 @@ class RedisClient:
         max_connections: int = 50,
         **kwargs
     ):
+        """
+        Redisクライアントの初期化
+        
+        Args:
+            host: Redisホスト
+            port: Redisポート
+            password: パスワード
+            db: データベース番号
+            decode_responses: レスポンスをデコードするか
+            socket_timeout: ソケットタイムアウト
+            socket_connect_timeout: 接続タイムアウト
+            max_connections: 最大接続数
+            **kwargs: その他のRedis接続パラメータ
+        """
         self.host = host
         self.port = port
         self.password = password
@@ -90,6 +109,16 @@ class RedisClient:
         namespace: str = "default",
         collection_suffix: str = "index_store"
     ) -> BaseIndexStore:
+        """
+        llama_index RedisIndexStoreを取得
+        
+        Args:
+            namespace: インデックスの名前空間
+            collection_suffix: コレクションサフィックス
+            
+        Returns:
+            RedisIndexStore インスタンス
+        """
         if self._index_store is None:
             client = self.get_client()
             self._index_store = RedisIndexStore(
@@ -168,11 +197,3 @@ class RedisClient:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """コンテキストマネージャーの終了"""
         self.disconnect()
-    
-    def reset(self, collection_name: str) -> None:
-        """指定したコレクションを削除して再作成"""
-        client = self.get_client()
-        keys = client.keys(f"{collection_name}:*")
-        if keys:
-            client.delete(*keys)
-        logger.info(f"コレクション '{collection_name}' をリセットしました")

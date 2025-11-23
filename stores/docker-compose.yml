@@ -192,21 +192,22 @@ services:
     ipc: host
     shm_size: "4g"
     command: >
-      --model=Qwen/Qwen3-VL-8B-Instruct
-      --tokenizer=Qwen/Qwen3-VL-8B-Instruct
+      --model=Qwen/Qwen3-8B-AWQ
+      --tokenizer=Qwen/Qwen3-8B-AWQ
       --dtype=auto
       --tensor-parallel-size=1
-      --max-model-len=8192   
+      --max-model-len=8192
       --download-dir=/models
       --host=0.0.0.0
       --port=8000
       --gpu-memory-utilization=0.6
+      --quantization=awq
     environment:
       - VLLM_USE_V1=1
       - DISABLE_CUSTOM_ALL_REDUCE=1
-      - NVIDIA_VISIBLE_DEVICES=0,1
+      - NVIDIA_VISIBLE_DEVICES=0
     volumes:
-      - ./volumes/vllm/models:/models
+      - ./volumes/vllm:/models
     ports:
       - 8000:8000
     healthcheck:

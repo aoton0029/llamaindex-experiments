@@ -1,5 +1,5 @@
-from .config_manager import ConfigManager
+from glossary_manager import GlossaryDataManager
 
 __all__ = [
-    "ConfigManager",
+    "GlossaryDataManager"
 ]

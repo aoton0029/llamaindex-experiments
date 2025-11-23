@@ -1,0 +1,43 @@
+
+evaluation_config_models:
+  llamaindex_basic:
+    name: "LlamaIndex Basic Evaluation"
+    description: "LlamaIndexを用いた基本的な評価設定"
+    framework: "llamaindex"
+    top_k: 3
+    dataset:
+      source: "file"  # 'auto', 'file'
+      file_path: "data/evaluation_datasets/sample_llamaindex_dataset.json"  # ファイルパス（sourceが'file'の場合）
+      
+    # 評価器の設定
+    evaluators: 
+      - "faithfulness"
+      - "relevancy"
+      - "correctness"
+      - "semantic_similarity"
+    # 評価器固有の設定
+    faithfulness_config:
+      # FaithfulnessEvaluator用の設定
+    relevancy_config:
+      # RelevancyEvaluator用の設定
+    correctness_config:
+      score_threshold: 3.0
+    semantic_similarity_config:
+      similarity_threshold: 0.8
+      similarity_mode: "cosine"
+    
+  ragas_basic:
+    name: "RAGas Basic Evaluation"
+    description: "RAGasを用いた基本的な評価設定"
+    framework: "ragas"
+    top_k: 3
+    dataset:
+      source: "file"  # 'auto'
+      file_path: "data/evaluation_datasets/sample_ragas_dataset.json"  # ファイルパス（sourceが'file'の場合）
+
+    # 評価器の設定
+    evaluators: 
+      - "faithfulness"
+      - "answer_relevancy"
+      - "context_precision"
+      - "context_recall"

@@ -1,0 +1,23 @@
+# 埋め込みモデル設定ファイル
+# 複数のembeddingバックエンドとモデルを定義
+
+embedding_config_models:
+  # Ollama系 (ローカル推論)
+  ollama_qwen3:
+    backend: "ollama"
+    model_name: "qwen3-embedding:8b"
+    base_url: "http://ollama:11434"
+    dimensions: 8192
+    kwargs:
+      # batch_size: 32
+      timeout: 3660
+
+  vllm_qwen3_vl:
+    backend: "vllm"
+    model_name: "/models/Qwen/Qwen3-VL-8B-Instruct"
+    dimensions: 8192
+    base_url: "http://vllm-embedding:8000/v1"
+    kwargs:
+      # batch_size: 32
+      timeout: 3660
+  

@@ -42,7 +42,6 @@ llama-index-readers-file
 llama-index-readers-json
 llama-index-readers-milvus
 llama-index-readers-mongodb
-llama-index-readers-pandas-ai
 llama-index-readers-whisper
 llama-index-readers-database
 llama-index-readers-graphdb-cypher

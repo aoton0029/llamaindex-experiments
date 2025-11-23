@@ -13,7 +13,6 @@ from llama_index.readers.file import (
     PandasExcelReader
 )
 import pymupdf4llm
-from pymupdf4llm.llama.pdf_markdown_reader import PDFMarkdownReader
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DocumentLoader():
     def __init__(self):
         self.loaders = {
-            ".pdf": PDFReader(),
+            ".pdf": pymupdf4llm.LlamaMarkdownReader(),
             ".docx": DocxReader(),
             ".epub": EpubReader(),
             ".md": MarkdownReader(),
@@ -48,12 +47,7 @@ class DocumentLoader():
                 all_documents.append(documents)
         return all_documents
     
-    def load_pdf_markdown(self, file_path: str) -> List[Document]:
-        try:
-            return PDFMarkdownReader().load_data(file=file_path)
-        except Exception as e:
-            logger.error(f"PDFMarkdownReaderエラー: {e}")
-            return []
+    def simple_load_from_directory(self, dir_path: str) -> List[Document]:
+        loader = SimpleDirectoryReader(dir_path)
+        return loader.load_data(True)
     
-    def load_with_pymupdf4llm(self, file_path: str) -> str:
-        return pymupdf4llm.to_markdown(file_path)

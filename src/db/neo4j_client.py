@@ -1,3 +1,8 @@
+"""
+Neo4jクライアントクラス
+グラフストアとして使用
+"""
+
 import logging
 from typing import Optional, Dict, Any, List
 from neo4j import GraphDatabase, Driver, Session
@@ -9,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jClient:
+    """
+    Neo4jクライアントクラス
+    llama_index Neo4jGraphStoreのラッパー
+    """
+    
     def __init__(
         self,
         uri: str = "bolt://localhost:7687",
@@ -20,6 +30,19 @@ class Neo4jClient:
         connection_acquisition_timeout: int = 60,
         **kwargs
     ):
+        """
+        Neo4jクライアントの初期化
+        
+        Args:
+            uri: Neo4j接続URI
+            username: ユーザー名
+            password: パスワード
+            database: データベース名
+            max_connection_lifetime: 最大接続ライフタイム
+            max_connection_pool_size: 最大接続プールサイズ
+            connection_acquisition_timeout: 接続取得タイムアウト
+            **kwargs: その他のNeo4j接続パラメータ
+        """
         self.uri = uri
         self.username = username
         self.password = password
@@ -33,6 +56,7 @@ class Neo4jClient:
         self._graph_store: Optional[Neo4jGraphStore] = None
     
     def connect(self) -> None:
+        """Neo4j接続を確立"""
         try:
             self._driver = GraphDatabase.driver(
                 self.uri,
@@ -55,6 +79,7 @@ class Neo4jClient:
             raise
     
     def disconnect(self) -> None:
+        """Neo4j接続を切断"""
         if self._driver:
             self._driver.close()
             self._driver = None
@@ -62,11 +87,13 @@ class Neo4jClient:
             logger.info("Neo4j接続を切断しました")
     
     def get_driver(self) -> Driver:
+        """Neo4jドライバーを取得"""
         if self._driver is None:
             self.connect()
         return self._driver
     
     def get_session(self) -> Session:
+        """Neo4jセッションを取得"""
         driver = self.get_driver()
         return driver.session(database=self.database)
     
@@ -76,6 +103,17 @@ class Neo4jClient:
         rel_type: str = "RELATED",
         **kwargs
     ) -> GraphStore:
+        """
+        llama_index Neo4jGraphStoreを取得
+        
+        Args:
+            node_label: ノードラベル
+            rel_type: リレーションシップタイプ
+            **kwargs: Neo4jGraphStoreの追加パラメータ
+            
+        Returns:
+            Neo4jGraphStore インスタンス
+        """
         if self._graph_store is None:
             self._graph_store = Neo4jGraphStore(
                 username=self.username,
@@ -94,6 +132,16 @@ class Neo4jClient:
         query: str, 
         parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
+        """
+        Cypherクエリを実行
+        
+        Args:
+            query: Cypherクエリ
+            parameters: クエリパラメータ
+            
+        Returns:
+            クエリ結果
+        """
         with self.get_session() as session:
             result = session.run(query, parameters or {})
             return [record.data() for record in result]
@@ -103,6 +151,16 @@ class Neo4jClient:
         query: str,
         parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
+        """
+        書き込みトランザクションを実行
+        
+        Args:
+            query: Cypherクエリ
+            parameters: クエリパラメータ
+            
+        Returns:
+            クエリ結果
+        """
         def _write_tx(tx, query, params):
             result = tx.run(query, params)
             return [record.data() for record in result]
@@ -116,6 +174,14 @@ class Neo4jClient:
         property_name: str,
         index_type: str = "BTREE"
     ) -> None:
+        """
+        インデックスを作成
+        
+        Args:
+            label: ノードラベル
+            property_name: プロパティ名
+            index_type: インデックスタイプ
+        """
         query = f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.{property_name})"
         self.execute_write_transaction(query)
         logger.info(f"インデックスを作成しました: {label}.{property_name}")
@@ -126,6 +192,14 @@ class Neo4jClient:
         property_name: str,
         constraint_type: str = "UNIQUE"
     ) -> None:
+        """
+        制約を作成
+        
+        Args:
+            label: ノードラベル
+            property_name: プロパティ名
+            constraint_type: 制約タイプ
+        """
         constraint_name = f"{label}_{property_name}_{constraint_type.lower()}"
         if constraint_type.upper() == "UNIQUE":
             query = f"CREATE CONSTRAINT {constraint_name} IF NOT EXISTS FOR (n:{label}) REQUIRE n.{property_name} IS UNIQUE"
@@ -136,11 +210,13 @@ class Neo4jClient:
         logger.info(f"制約を作成しました: {constraint_name}")
     
     def clear_database(self) -> None:
+        """データベースをクリア（全ノード・リレーションシップ削除）"""
         query = "MATCH (n) DETACH DELETE n"
         self.execute_write_transaction(query)
         logger.info("データベースをクリアしました")
     
     def get_node_count(self, label: Optional[str] = None) -> int:
+        """ノード数を取得"""
         if label:
             query = f"MATCH (n:{label}) RETURN count(n) AS count"
         else:
@@ -150,6 +226,7 @@ class Neo4jClient:
         return result[0]["count"] if result else 0
     
     def get_relationship_count(self, rel_type: Optional[str] = None) -> int:
+        """リレーションシップ数を取得"""
         if rel_type:
             query = f"MATCH ()-[r:{rel_type}]-() RETURN count(r) AS count"
         else:
@@ -159,6 +236,7 @@ class Neo4jClient:
         return result[0]["count"] if result else 0
     
     def get_database_info(self) -> Dict[str, Any]:
+        """データベース情報を取得"""
         node_count = self.get_node_count()
         relationship_count = self.get_relationship_count()
         
@@ -178,6 +256,7 @@ class Neo4jClient:
         }
     
     def health_check(self) -> bool:
+        """ヘルスチェック"""
         try:
             with self.get_session() as session:
                 result = session.run("RETURN 1 AS test")
@@ -188,12 +267,10 @@ class Neo4jClient:
             return False
     
     def __enter__(self):
+        """コンテキストマネージャーのエントリ"""
         self.connect()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """コンテキストマネージャーの終了"""
         self.disconnect()
-
-    def reset(self) -> None:
-        """データベースをクリアして再作成"""
-        self.clear_database()

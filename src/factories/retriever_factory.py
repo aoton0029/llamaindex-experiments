@@ -9,6 +9,9 @@ from abc import ABC, abstractmethod
 
 from llama_index.core.schema import NodeWithScore, QueryBundle
 from llama_index.core.retrievers import (
+    BaseRetriever,
+    BaseImageRetriever,
+    BasePGRetriever,
     VectorIndexRetriever,
     KeywordTableSimpleRetriever,
     SummaryIndexRetriever,
@@ -23,14 +26,14 @@ from llama_index.core.retrievers import (
     VectorIndexAutoRetriever,
     KnowledgeGraphRAGRetriever
 )
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.core.postprocessor import (
-    SimilarityPostprocessor,
-    KeywordNodePostprocessor
-)
 from llama_index.core.indices.base import BaseIndex
 
 logger = logging.getLogger(__name__)
+
+class GoldenRetriever(BaseRetriever):
+    def __init__(self, index: BaseIndex, **kwargs: Any) -> None:
+        super().__init__(index=index, **kwargs)
+
 
 class RetrieverFactory:
     @staticmethod
@@ -64,18 +67,3 @@ class RetrieverFactory:
         else:
             raise ValueError(f"未知のリトリバータイプ: {retriever_type}")
     
-    @staticmethod
-    def add_postprocessor(
-        retriever: BaseRetriever,
-        postprocessor_type: str,
-        **kwargs
-    ) -> BaseRetriever:
-        if postprocessor_type == "similarity":
-            postprocessor = SimilarityPostprocessor(**kwargs)
-        elif postprocessor_type == "keyword_node":
-            postprocessor = KeywordNodePostprocessor(**kwargs)
-        else:
-            raise ValueError(f"未知のポストプロセッサタイプ: {postprocessor_type}")
-        
-        retriever.postprocessors.append(postprocessor)
-        return retriever

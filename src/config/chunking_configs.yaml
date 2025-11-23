@@ -1,0 +1,91 @@
+# チャンキング設定ファイル
+# 複数のチャンキング手法とそのパラメータを定義
+
+chunker_config_models:
+  token_based_small:
+    type: "token"
+    kwargs:
+      chunk_size: 512
+      chunk_overlap: 50
+      separator: " "
+      backup_separators: ["。", "！", "？", "\n", "、"]
+
+  token_based_middle:
+    type: "token"
+    kwargs:
+      chunk_size: 1024
+      chunk_overlap: 100
+      separator: " "
+      backup_separators: ["。", "！", "？", "\n", "、"]
+
+  token_based_large:
+    type: "token"
+    kwargs:
+      chunk_size: 2048
+      chunk_overlap: 200
+      separator: " "
+      backup_separators: ["。", "！", "？", "\n", "、"]
+  
+  # 文書構造ベース
+  sentence_based_small:
+    type: "sentence"
+    kwargs:
+      chunk_size: 512
+      chunk_overlap: 50
+      separator: " "
+      paragraph_separator: "\n\n\n"
+      secondary_chunking_regex: "[。！？\n]+"
+
+  sentence_based_middle:
+    type: "sentence"
+    kwargs:
+      chunk_size: 1024
+      chunk_overlap: 100
+      separator: " "
+      paragraph_separator: "\n\n\n"
+      secondary_chunking_regex: "[。！？\n]+"
+
+  sentence_based_large:
+    type: "sentence"
+    kwargs:
+      chunk_size: 2048
+      chunk_overlap: 200
+      separator: " "
+      paragraph_separator: "\n\n\n"
+      secondary_chunking_regex: "[。！？\n]+"
+
+  # 
+  semantic_splitter:
+    type: "semantic"
+    kwargs:
+      buffer_size: 1
+      breakpoint_percentile_threshold: 95
+  
+  hierarchical_node_parser:
+    type: "hierarchical"
+    kwargs:
+      chunk_sizes: [2048, 512, 128]
+      chunk_overlap: 50
+  
+  markdown_header:
+    type: "markdown_header_splitter"
+    kwargs:
+      headers_to_split_on:
+        - ["#", "Header 1"]
+        - ["##", "Header 2"]  
+        - ["###", "Header 3"]
+      strip_headers: false
+      return_each_line: false
+    
+  html_header:
+    type: "html_header_splitter"
+    kwargs:
+      headers_to_split_on:
+        - ["h1", "Header 1"]
+        - ["h2", "Header 2"]
+        - ["h3", "Header 3"]
+      return_each_element: false
+
+  
+
+      

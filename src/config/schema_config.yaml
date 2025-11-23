@@ -1,0 +1,98 @@
+# ドキュメントローダー用メタデータ定義
+metadata:
+  - name: "title"
+  - name: "page"
+  - name: "total_pages"
+  - name: "file_path"
+
+# vector_store用スキーマ定義
+vector_store_schema:
+  - name: "text"
+    dtype: "VARCHAR"
+    max_length: 65535
+    description: "Document text content"
+  - name: "document_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Unique identifier for the document"
+  - name: "doc_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Document identifier"
+  - name: "_node_type"
+    dtype: "VARCHAR"
+    max_length: 128
+    description: "Type of the node"
+  - name: "_node_content"
+    dtype: "VARCHAR"
+    max_length: 65535
+    description: "Content of the node"
+  - name: "ref_doc_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Reference document identifier"
+  # 追加メタデータ
+  - name: "title"
+    dtype: "VARCHAR"
+    max_length: 1024
+    description: "Title of the document"
+  - name: "page"
+    dtype: "INT64"
+    description: "Page number of the document"
+  - name: "total_pages"
+    dtype: "INT64"
+    description: "Total number of pages in the document"
+  - name: "file_path"
+    dtype: "VARCHAR"
+    max_length: 2048
+    description: "File path of the document"
+
+# image_store用スキーマ定義
+image_store_schema:
+  - name: "text"
+    dtype: "VARCHAR"
+    max_length: 65535
+    description: "Document text content"
+  - name: "document_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Unique identifier for the document"
+  - name: "doc_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Document identifier"
+  - name: "_node_type"
+    dtype: "VARCHAR"
+    max_length: 128
+    description: "Type of the node"
+  - name: "_node_content"
+    dtype: "VARCHAR"
+    max_length: 65535
+    description: "Content of the node"
+  - name: "ref_doc_id"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Reference document identifier"
+  # 追加メタデータ
+  # - name: "title"
+  #   dtype: "VARCHAR"
+  #   max_length: 1024
+  #   description: "Title of the document"
+  # - name: "page"
+  #   dtype: "INT64"
+  #   description: "Page number of the document"
+  # - name: "total_pages"
+  #   dtype: "INT64"
+  #   description: "Total number of pages in the document"
+  # - name: "file_path"
+  #   dtype: "VARCHAR"
+  #   max_length: 2048
+  #   description: "File path of the document"
+  - name: "page_label"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Reference document identifier"
+  - name: "file_name"
+    dtype: "VARCHAR"
+    max_length: 256
+    description: "Reference document identifier"

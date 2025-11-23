@@ -1,4 +1,5 @@
-
+from dataclasses import dataclass
+from typing import Optional
 from llama_index.core import Settings
 from llama_index.core.prompts import SelectorPromptTemplate
 from llama_index.core.prompts.base import PromptTemplate
@@ -6,321 +7,366 @@ from llama_index.core.prompts.prompt_type import PromptType
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.prompts.base import ChatPromptTemplate
 
-def is_chat_model() -> bool:
-    return Settings.llm.metadata.is_chat_model
+@dataclass
+class _TemplatePromptSettings:
+    """テンプレートプロンプト設定クラス
+    
+    デフォルトはNone（LlamaIndexのデフォルトを使用）。
+    YAMLファイルから設定を読み込んでオーバーライドできる。
+    """
+    
+    _config_manager: Optional[object] = None
+    _templates_loaded: bool = False
+    
+    @classmethod
+    def initialize(cls, config_manager: Optional[object] = None):
+        """ConfigManagerを設定してテンプレートを初期化"""
+        cls._config_manager = config_manager
+        cls._templates_loaded = False
+    
+    @classmethod
+    def _load_templates(cls):
+        """YAMLからテンプレートを読み込み"""
+        if cls._templates_loaded or cls._config_manager is None:
+            return
+        
+        try:
+            templates = cls._config_manager.get_template_prompts()
+            
+            # 各カテゴリのテンプレートをオーバーライド
+            if "simple_input" in templates:
+                simple_input = templates["simple_input"]
+                if "jp_simple_input_tmpl" in simple_input:
+                    cls.JP_SIMPLE_INPUT_TMPL = simple_input["jp_simple_input_tmpl"]
+            
+            if "text_qa" in templates:
+                text_qa = templates["text_qa"]
+                if "jp_text_qa_tmpl" in text_qa:
+                    cls.JP_TEXT_QA_PROMPT_TMPL = text_qa["jp_text_qa_tmpl"]
+            
+            if "tree_summarize" in templates:
+                tree_summarize = templates["tree_summarize"]
+                if "jp_tree_summarize_tmpl" in tree_summarize:
+                    cls.JP_TREE_SUMMARIZE_TMPL = tree_summarize["jp_tree_summarize_tmpl"]
+            
+            if "refine" in templates:
+                refine = templates["refine"]
+                if "jp_refine_tmpl" in refine:
+                    cls.JP_REFINE_PROMPT_TMPL = refine["jp_refine_tmpl"]
+            
+            if "refine_table_context" in templates:
+                refine_table = templates["refine_table_context"]
+                if "jp_refine_table_context_tmpl" in refine_table:
+                    cls.JP_REFINE_TABLE_CONTEXT_TMPL = refine_table["jp_refine_table_context_tmpl"]
+            
+            if "selection" in templates:
+                selection = templates["selection"]
+                if "jp_single_select_tmpl" in selection:
+                    cls.JP_SINGLE_SELECT_PROMPT_TMPL = selection["jp_single_select_tmpl"]
+                if "jp_multi_select_tmpl" in selection:
+                    cls.JP_MULTI_SELECT_PROMPT_TMPL = selection["jp_multi_select_tmpl"]
+            
+            if "extractor" in templates:
+                extractor = templates["extractor"]
+                if "jp_title_node_template" in extractor:
+                    cls.JP_TITLE_NODE_TEMPLATE = extractor["jp_title_node_template"]
+                if "jp_title_combine_template" in extractor:
+                    cls.JP_TITLE_COMBINE_TEMPLATE = extractor["jp_title_combine_template"]
+                if "jp_summary_extract_template" in extractor:
+                    cls.JP_SUMMARY_EXTRACT_TEMPLATE = extractor["jp_summary_extract_template"]
+                if "jp_question_gen_tmpl" in extractor:
+                    cls.JP_QUESTION_GEN_TMPL = extractor["jp_question_gen_tmpl"]
+            
+            if "evaluation" in templates:
+                evaluation = templates["evaluation"]
+                if "jp_question_generation_prompt" in evaluation:
+                    cls.JP_QUESTION_GENERATION_PROMPT = evaluation["jp_question_generation_prompt"]
+                if "jp_question_gen_query" in evaluation:
+                    cls.JP_QUESTION_GEN_QUERY = evaluation["jp_question_gen_query"]
+                if "jp_eval_template_tmpl" in evaluation:
+                    cls.JP_EVAL_TEMPLATE_TMPL = evaluation["jp_eval_template_tmpl"]
+                if "jp_refine_template_tmpl" in evaluation:
+                    cls.JP_REFINE_TEMPLATE_TMPL = evaluation["jp_refine_template_tmpl"]
+                if "jp_summary_query" in evaluation:
+                    cls.JP_SUMMARY_QUERY = evaluation["jp_summary_query"]
+                if "jp_summary_query_tech" in evaluation:
+                    cls.JP_SUMMARY_QUERY_TECH = evaluation["jp_summary_query_tech"]
+                if "jp_summary_prompt_tmpl" in evaluation:
+                    cls.JP_SUMMARY_PROMPT_TMPL = evaluation["jp_summary_prompt_tmpl"]
+                if "jp_insert_prompt_tmpl" in evaluation:
+                    cls.JP_INSERT_PROMPT_TMPL = evaluation["jp_insert_prompt_tmpl"]
+                if "jp_keyword_extract_template_tmpl" in evaluation:
+                    cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL = evaluation["jp_keyword_extract_template_tmpl"]
+            
+            # プロンプトオブジェクトを再生成
+            cls._regenerate_prompts()
+            
+            cls._templates_loaded = True
+        except Exception as e:
+            # エラーが発生してもデフォルト値（None）を使用
+            print(f"Warning: Failed to load templates from YAML: {e}")
+    
+    @classmethod
+    def _regenerate_prompts(cls):
+        """テンプレート文字列からプロンプトオブジェクトを再生成（Noneでない場合のみ）"""
+        if cls.JP_SIMPLE_INPUT_TMPL is not None:
+            cls.JP_SIMPLE_INPUT_PROMPT = PromptTemplate(
+                cls.JP_SIMPLE_INPUT_TMPL, prompt_type=PromptType.SIMPLE_INPUT
+            )
+        
+        if cls.JP_TEXT_QA_PROMPT_TMPL is not None:
+            cls.JP_TEXT_QA_PROMPT = PromptTemplate(
+                cls.JP_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
+            )
+        
+        if cls.JP_TREE_SUMMARIZE_TMPL is not None:
+            cls.JP_TREE_SUMMARIZE_PROMPT = PromptTemplate(
+                cls.JP_TREE_SUMMARIZE_TMPL, prompt_type=PromptType.SUMMARY
+            )
+        
+        if cls.JP_REFINE_PROMPT_TMPL is not None:
+            cls.JP_REFINE_PROMPT = PromptTemplate(
+                cls.JP_REFINE_PROMPT_TMPL, prompt_type=PromptType.REFINE
+            )
+        
+        if cls.JP_REFINE_TABLE_CONTEXT_TMPL is not None:
+            cls.JP_REFINE_TABLE_CONTEXT_PROMPT = PromptTemplate(
+                cls.JP_REFINE_TABLE_CONTEXT_TMPL, prompt_type=PromptType.TABLE_CONTEXT
+            )
+        
+        if cls.JP_EVAL_TEMPLATE_TMPL is not None:
+            cls.JP_EVAL_TEMPLATE = PromptTemplate(
+                cls.JP_EVAL_TEMPLATE_TMPL, prompt_type=PromptType.EVAL
+            )
+        
+        if cls.JP_REFINE_TEMPLATE_TMPL is not None:
+            cls.JP_REFINE_TEMPLATE = PromptTemplate(
+                cls.JP_REFINE_TEMPLATE_TMPL, prompt_type=PromptType.REFINE
+            )
+        
+        if cls.JP_SUMMARY_PROMPT_TMPL is not None:
+            cls.JP_SUMMARY_PROMPT = PromptTemplate(
+                cls.JP_SUMMARY_PROMPT_TMPL, prompt_type=PromptType.SUMMARY
+            )
+        
+        if cls.JP_INSERT_PROMPT_TMPL is not None:
+            cls.JP_INSERT_PROMPT = PromptTemplate(
+                cls.JP_INSERT_PROMPT_TMPL, prompt_type=PromptType.TREE_INSERT
+            )
+        
+        if cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL is not None:
+            cls.JP_KEYWORD_EXTRACT_TEMPLATE = PromptTemplate(
+                cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL, prompt_type=PromptType.KEYWORD_EXTRACT
+            )
+        
+        # Selector prompts (デフォルトテンプレートがNoneでない場合のみ生成)
+        if cls.JP_TEXT_QA_PROMPT is not None:
+            cls.JP_TEXT_QA_PROMPT_SEL = SelectorPromptTemplate(
+                default_template=cls.JP_TEXT_QA_PROMPT,
+                conditionals=cls.default_text_qa_conditionals,
+            )
+        
+        if cls.JP_TREE_SUMMARIZE_PROMPT is not None:
+            cls.JP_TREE_SUMMARIZE_PROMPT_SEL = SelectorPromptTemplate(
+                default_template=cls.JP_TREE_SUMMARIZE_PROMPT,
+                conditionals=cls.default_tree_summarize_conditionals,
+            )
+        
+        if cls.JP_REFINE_PROMPT is not None:
+            cls.JP_REFINE_PROMPT_SEL = SelectorPromptTemplate(
+                default_template=cls.JP_REFINE_PROMPT,
+                conditionals=cls.default_refine_conditionals,
+            )
+        
+        if cls.JP_REFINE_TABLE_CONTEXT_PROMPT is not None:
+            cls.JP_REFINE_TABLE_CONTEXT_PROMPT_SEL = SelectorPromptTemplate(
+                default_template=cls.JP_REFINE_TABLE_CONTEXT_PROMPT,
+                conditionals=cls.default_refine_table_conditionals,
+            )
+    
+    @classmethod
+    def get_templates_info(cls) -> dict:
+        """現在のテンプレート設定情報を取得（テスト記録用）"""
+        if not cls._templates_loaded and cls._config_manager:
+            cls._load_templates()
+        
+        return {
+            "templates_loaded_from_yaml": cls._templates_loaded,
+            "simple_input": cls.JP_SIMPLE_INPUT_TMPL,
+            "text_qa": cls.JP_TEXT_QA_PROMPT_TMPL,
+            "tree_summarize": cls.JP_TREE_SUMMARIZE_TMPL,
+            "refine": cls.JP_REFINE_PROMPT_TMPL,
+            "refine_table_context": cls.JP_REFINE_TABLE_CONTEXT_TMPL,
+            "single_select": cls.JP_SINGLE_SELECT_PROMPT_TMPL,
+            "multi_select": cls.JP_MULTI_SELECT_PROMPT_TMPL,
+            "extractor": {
+                "title_node": cls.JP_TITLE_NODE_TEMPLATE,
+                "title_combine": cls.JP_TITLE_COMBINE_TEMPLATE,
+                "summary_extract": cls.JP_SUMMARY_EXTRACT_TEMPLATE,
+                "question_gen": cls.JP_QUESTION_GEN_TMPL,
+            },
+            "evaluation": {
+                "question_generation": cls.JP_QUESTION_GENERATION_PROMPT,
+                "question_gen_query": cls.JP_QUESTION_GEN_QUERY,
+                "eval_template": cls.JP_EVAL_TEMPLATE_TMPL,
+                "refine_template": cls.JP_REFINE_TEMPLATE_TMPL,
+                "summary_query": cls.JP_SUMMARY_QUERY,
+                "summary_query_tech": cls.JP_SUMMARY_QUERY_TECH,
+                "summary_prompt": cls.JP_SUMMARY_PROMPT_TMPL,
+                "insert_prompt": cls.JP_INSERT_PROMPT_TMPL,
+                "keyword_extract": cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
+            }
+        }
+    
+    @staticmethod
+    def is_chat_model() -> bool:
+        return Settings.llm.metadata.is_chat_model
 
-# Simple Input
-DEFAULT_SIMPLE_INPUT_TMPL = "{query_str}"
-DEFAULT_SIMPLE_INPUT_PROMPT = PromptTemplate(
-    DEFAULT_SIMPLE_INPUT_TMPL, prompt_type=PromptType.SIMPLE_INPUT
-)
+    # デフォルト値を None に設定（LlamaIndexのデフォルトを使用）
+    # YAMLで設定されている場合のみオーバーライドされる
+    
+    # Simple Input
+    JP_SIMPLE_INPUT_TMPL = None
+    JP_SIMPLE_INPUT_PROMPT = None
 
-# Text QA
-TEXT_QA_SYSTEM_PROMPT = ChatMessage(
-    content=(
-        "あなたは世界中で信頼されている専門のQ&Aシステムです。\n"
-        "常に提供されたコンテキスト情報のみを用いて質問に回答し、事前の知識は使用しないでください。\n"
-        "従うべきルール:\n"
-        "1. 回答内で与えられたコンテキストを直接参照しないでください。\n"
-        "2. 「コンテキストに基づいて...」や「コンテキスト情報...」のような表現を避けてください。"
-    ),
-    role=MessageRole.SYSTEM,
-)
-
-TEXT_QA_PROMPT_TMPL_MSGS = [
-    TEXT_QA_SYSTEM_PROMPT,
-    ChatMessage(
+    # Text QA
+    TEXT_QA_SYSTEM_PROMPT = ChatMessage(
         content=(
-            "以下にコンテキスト情報を示します。\n"
-            "---------------------\n"
-            "{context_str}\n"
-            "---------------------\n"
-            "コンテキスト情報のみを用いて質問に回答してください（事前知識は使用しないでください）。\n"
-            "質問: {query_str}\n"
-            "回答: "
+            "あなたは世界中で信頼されている専門のQ&Aシステムです。\n"
+            "常に提供されたコンテキスト情報のみを用いて質問に回答し、事前の知識は使用しないでください。\n"
+            "従うべきルール:\n"
+            "1. 回答内で与えられたコンテキストを直接参照しないでください。\n"
+            "2. 「コンテキストに基づいて...」や「コンテキスト情報...」のような表現を避けてください。"
         ),
-        role=MessageRole.USER,
-    ),
-]
-
-CHAT_TEXT_QA_PROMPT = ChatPromptTemplate(message_templates=TEXT_QA_PROMPT_TMPL_MSGS)
-
-JP_TEXT_QA_PROMPT_TMPL = (
-    "以下にコンテキスト情報を示します。\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n"
-    "コンテキスト情報のみを用いて質問に回答してください（事前知識は使用しないでください）。\n"
-    "質問: {query_str}\n"
-    "回答: "
-)
-JP_TEXT_QA_PROMPT = PromptTemplate(
-    JP_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
-)
-default_text_qa_conditionals = [(is_chat_model, CHAT_TEXT_QA_PROMPT)]
-DEFAULT_TEXT_QA_PROMPT_SEL = SelectorPromptTemplate(
-    default_template=JP_TEXT_QA_PROMPT,
-    conditionals=default_text_qa_conditionals,
-)
-
-
-# Tree Summarize
-TREE_SUMMARIZE_PROMPT_TMPL_MSGS = [
-    TEXT_QA_SYSTEM_PROMPT,
-    ChatMessage(
-        content=(
-            "複数のソースからのコンテキスト情報を以下に示します。\n"
-            "---------------------\n"
-            "{context_str}\n"
-            "---------------------\n"
-            "複数の情報を踏まえて（事前知識は使用せずに）質問に回答してください。\n"
-            "質問: {query_str}\n"
-            "回答: "
-        ),
-        role=MessageRole.USER,
-    ),
-]
-
-CHAT_TREE_SUMMARIZE_PROMPT = ChatPromptTemplate(
-    message_templates=TREE_SUMMARIZE_PROMPT_TMPL_MSGS
-)
-
-
-# Refine Prompt
-CHAT_REFINE_PROMPT_TMPL_MSGS = [
-    ChatMessage(
-        content=(
-            "あなたは既存の回答を洗練する際、厳密に次の2つのモードで動作する専門のQ&Aシステムです：\n"
-            "1. 新しいコンテキストを用いて元の回答を**書き直す**。\n"
-            "2. 新しいコンテキストが有用でない場合は元の回答を**繰り返す**。\n"
-            "回答内で元の回答やコンテキストを直接参照しないでください。\n"
-            "迷ったら元の回答を繰り返してください。\n"
-            "新しいコンテキスト: {context_msg}\n"
-            "質問: {query_str}\n"
-            "元の回答: {existing_answer}\n"
-            "新しい回答: "
-        ),
-        role=MessageRole.USER,
+        role=MessageRole.SYSTEM,
     )
-]
 
-
-CHAT_REFINE_PROMPT = ChatPromptTemplate(message_templates=CHAT_REFINE_PROMPT_TMPL_MSGS)
-
-DEFAULT_TREE_SUMMARIZE_TMPL = (
-    "複数のソースからのコンテキスト情報を以下に示します。\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n"
-    "複数の情報を踏まえて（事前知識は使用せずに）質問に回答してください。\n"
-    "質問: {query_str}\n"
-    "回答: "
-)
-DEFAULT_TREE_SUMMARIZE_PROMPT = PromptTemplate(
-    DEFAULT_TREE_SUMMARIZE_TMPL, prompt_type=PromptType.SUMMARY
-)
-default_tree_summarize_conditionals = [(is_chat_model, CHAT_TREE_SUMMARIZE_PROMPT)]
-DEFAULT_TREE_SUMMARIZE_PROMPT_SEL = SelectorPromptTemplate(
-    default_template=DEFAULT_TREE_SUMMARIZE_PROMPT,
-    conditionals=default_tree_summarize_conditionals,
-)
-
-# Refine
-DEFAULT_REFINE_PROMPT_TMPL = (
-    "元の質問は次の通りです: {query_str}\n"
-    "既に提供されている回答: {existing_answer}\n"
-    "以下の追加コンテキストを使って、必要に応じて既存の回答を改善する機会があります。\n"
-    "------------\n"
-    "{context_msg}\n"
-    "------------\n"
-    "新しいコンテキストを踏まえて、元の回答をより良く質問に答えるように洗練してください。"
-    "コンテキストが有用でない場合は元の回答を返してください。\n"
-    "改善された回答: "
-)
-DEFAULT_REFINE_PROMPT = PromptTemplate(
-    DEFAULT_REFINE_PROMPT_TMPL, prompt_type=PromptType.REFINE
-)
-default_refine_conditionals = [(is_chat_model, CHAT_REFINE_PROMPT)]
-DEFAULT_REFINE_PROMPT_SEL = SelectorPromptTemplate(
-    default_template=DEFAULT_REFINE_PROMPT,
-    conditionals=default_refine_conditionals,
-)
-
-# Refine Table Context
-CHAT_REFINE_TABLE_CONTEXT_TMPL_MSGS = [
-    ChatMessage(content="{query_str}", role=MessageRole.USER),
-    ChatMessage(content="{existing_answer}", role=MessageRole.ASSISTANT),
-    ChatMessage(
-        content=(
-             "以下にテーブルのスキーマを示します。\n"
-            "---------------------\n"
-            "{schema}\n"
-            "---------------------\n"
-            "さらにコンテキスト情報を以下に示します。{context_msg}\n"
-            "---------------------\n"
-            "テーブルのスキーマとコンテキスト情報を用いて元の回答を改善してください。"
-            "コンテキストが有用でない場合は元の回答を返してください。"
+    TEXT_QA_PROMPT_TMPL_MSGS = [
+        TEXT_QA_SYSTEM_PROMPT,
+        ChatMessage(
+            content=(
+                "以下にコンテキスト情報を示します。\n"
+                "---------------------\n"
+                "{context_str}\n"
+                "---------------------\n"
+                "コンテキスト情報のみを用いて質問に回答してください（事前知識は使用しないでください）。\n"
+                "質問: {query_str}\n"
+                "回答: "
+            ),
+            role=MessageRole.USER,
         ),
-        role=MessageRole.USER,
-    ),
-]
-CHAT_REFINE_TABLE_CONTEXT_PROMPT = ChatPromptTemplate(
-    message_templates=CHAT_REFINE_TABLE_CONTEXT_TMPL_MSGS
-)
-DEFAULT_REFINE_TABLE_CONTEXT_TMPL = (
-     "以下にテーブルのスキーマを示します。\n"
-    "---------------------\n"
-    "{schema}\n"
-    "---------------------\n"
-    "さらにコンテキスト情報を以下に示します。{context_msg}\n"
-    "---------------------\n"
-    "テーブルのスキーマとコンテキスト情報を用いて次のタスクに対する回答を作成してください: {query_str}\n"
-    "既に提供されている回答: {existing_answer}\n"
-    "新しいコンテキストを踏まえて、元の回答をより良くするように改善してください。"
-    "コンテキストが有用でない場合は元の回答を返してください。"
-)
-DEFAULT_REFINE_TABLE_CONTEXT_PROMPT = PromptTemplate(
-    DEFAULT_REFINE_TABLE_CONTEXT_TMPL, prompt_type=PromptType.TABLE_CONTEXT
-)
-default_refine_table_conditionals = [(is_chat_model, CHAT_REFINE_TABLE_CONTEXT_PROMPT)]
-DEFAULT_REFINE_TABLE_CONTEXT_PROMPT_SEL = SelectorPromptTemplate(
-    default_template=DEFAULT_REFINE_TABLE_CONTEXT_PROMPT,
-    conditionals=default_refine_table_conditionals,
-)
+    ]
 
+    CHAT_TEXT_QA_PROMPT = ChatPromptTemplate(message_templates=TEXT_QA_PROMPT_TMPL_MSGS)
 
-# single select
-DEFAULT_SINGLE_SELECT_PROMPT_TMPL = (
-    "以下に候補が番号付きリスト（1〜{num_choices}）で示されています。各項目はサマリーに対応します。\n"
-    "---------------------\n"
-    "{context_list}"
-    "\n---------------------\n"
-    "上記の選択肢のみを用い、事前の知識は使わずに、質問'{query_str}'に最も関連する選択肢を返してください。\n"
-)
+    JP_TEXT_QA_PROMPT_TMPL = None
+    JP_TEXT_QA_PROMPT = None
 
+    default_text_qa_conditionals = [(is_chat_model, CHAT_TEXT_QA_PROMPT)]
+    JP_TEXT_QA_PROMPT_SEL = None
 
-# multiple select
-DEFAULT_MULTI_SELECT_PROMPT_TMPL = (
-    "以下に候補が番号付きリスト（1〜{num_choices}）で示されています。各項目はサマリーに対応します。\n"
-    "---------------------\n"
-    "{context_list}"
-    "\n---------------------\n"
-    "上記の選択肢のみを用い、事前の知識は使わず、質問'{query_str}'に最も関連する上位の選択肢を返してください（最大で{max_outputs}件まで、必要な分だけ選んでください）。\n"
-)
+    # Tree Summarize
+    TREE_SUMMARIZE_PROMPT_TMPL_MSGS = [
+        TEXT_QA_SYSTEM_PROMPT,
+        ChatMessage(
+            content=(
+                "複数のソースからのコンテキスト情報を以下に示します。\n"
+                "---------------------\n"
+                "{context_str}\n"
+                "---------------------\n"
+                "複数の情報を踏まえて（事前知識は使用せずに）質問に回答してください。\n"
+                "質問: {query_str}\n"
+                "回答: "
+            ),
+            role=MessageRole.USER,
+        ),
+    ]
 
+    CHAT_TREE_SUMMARIZE_PROMPT = ChatPromptTemplate(
+        message_templates=TREE_SUMMARIZE_PROMPT_TMPL_MSGS
+    )
 
-##############################################################
-# Extractor Prompt Templates
-##############################################################
-DEFAULT_TITLE_NODE_TEMPLATE = """コンテキスト: {context_str}\nこの内容に含まれる固有の項目、見出し、またはテーマをまとめて表す短いタイトルを付けてください。\nタイトル: """
-DEFAULT_TITLE_COMBINE_TEMPLATE = """{context_str}\n上記の候補タイトルと内容に基づいて、この文書全体を最も包括的に表すタイトルを決定してください。\nタイトル: """
+    JP_TREE_SUMMARIZE_TMPL = None
+    JP_TREE_SUMMARIZE_PROMPT = None
+    default_tree_summarize_conditionals = [(is_chat_model, CHAT_TREE_SUMMARIZE_PROMPT)]
+    JP_TREE_SUMMARIZE_PROMPT_SEL = None
 
-DEFAULT_SUMMARY_EXTRACT_TEMPLATE = """\
-セクションの内容は以下の通りです:
-{context_str}
+    # Refine Prompt
+    CHAT_REFINE_PROMPT_TMPL_MSGS = [
+        ChatMessage(
+            content=(
+                "あなたは既存の回答を洗練する際、厳密に次の2つのモードで動作する専門のQ&Aシステムです：\n"
+                "1. 新しいコンテキストを用いて元の回答を**書き直す**。\n"
+                "2. 新しいコンテキストが有用でない場合は元の回答を**繰り返す**。\n"
+                "回答内で元の回答やコンテキストを直接参照しないでください。\n"
+                "迷ったら元の回答を繰り返してください。\n"
+                "新しいコンテキスト: {context_msg}\n"
+                "質問: {query_str}\n"
+                "元の回答: {existing_answer}\n"
+                "新しい回答: "
+            ),
+            role=MessageRole.USER,
+        )
+    ]
 
-このセクションの主要なトピックと登場する主体（エンティティ）を簡潔に要約してください。
+    CHAT_REFINE_PROMPT = ChatPromptTemplate(message_templates=CHAT_REFINE_PROMPT_TMPL_MSGS)
 
-要約: """
+    JP_REFINE_PROMPT_TMPL = None
+    JP_REFINE_PROMPT = None
+    default_refine_conditionals = [(is_chat_model, CHAT_REFINE_PROMPT)]
+    JP_REFINE_PROMPT_SEL = None
 
-DEFAULT_KEYWORD_EXTRACT_TEMPLATE = """\
-{context_str}\nこの文書を表す重複のないキーワードを{keywords}個挙げてください。カンマ区切りで記載してください。\nキーワード: """
+    # Refine Table Context
+    CHAT_REFINE_TABLE_CONTEXT_TMPL_MSGS = [
+        ChatMessage(content="{query_str}", role=MessageRole.USER),
+        ChatMessage(content="{existing_answer}", role=MessageRole.ASSISTANT),
+        ChatMessage(
+            content=(
+                 "以下にテーブルのスキーマを示します。\n"
+                "---------------------\n"
+                "{schema}\n"
+                "---------------------\n"
+                "さらにコンテキスト情報を以下に示します。{context_msg}\n"
+                "---------------------\n"
+                "テーブルのスキーマとコンテキスト情報を用いて元の回答を改善してください。"
+                "コンテキストが有用でない場合は元の回答を返してください。"
+            ),
+            role=MessageRole.USER,
+        ),
+    ]
+    CHAT_REFINE_TABLE_CONTEXT_PROMPT = ChatPromptTemplate(
+        message_templates=CHAT_REFINE_TABLE_CONTEXT_TMPL_MSGS
+    )
+    
+    JP_REFINE_TABLE_CONTEXT_TMPL = None
+    JP_REFINE_TABLE_CONTEXT_PROMPT = None
+    default_refine_table_conditionals = [(is_chat_model, CHAT_REFINE_TABLE_CONTEXT_PROMPT)]
+    JP_REFINE_TABLE_CONTEXT_PROMPT_SEL = None
 
-DEFAULT_QUESTION_GEN_TMPL = """\
-コンテキストは以下の通りです:
-{context_str}
+    # Selection
+    JP_SINGLE_SELECT_PROMPT_TMPL = None
+    JP_MULTI_SELECT_PROMPT_TMPL = None
 
-このコンテキストに基づき、他では見つかりにくい具体的な解答をこの文脈から導ける質問を{num_questions}件生成してください。
+    # Extractor
+    JP_TITLE_NODE_TEMPLATE = None
+    JP_TITLE_COMBINE_TEMPLATE = None
+    JP_SUMMARY_EXTRACT_TEMPLATE = None
+    JP_QUESTION_GEN_TMPL = None
 
-周辺の文脈を高次に要約した情報を付け加えても構いません。これらの要約を活用して、このコンテキストが答えられるより適切な質問を作成してください。"""
+    # Evaluation
+    JP_QUESTION_GENERATION_PROMPT = None
+    JP_QUESTION_GEN_QUERY = None
+    JP_EVAL_TEMPLATE_TMPL = None
+    JP_EVAL_TEMPLATE = None
+    JP_REFINE_TEMPLATE_TMPL = None
+    JP_REFINE_TEMPLATE = None
+    JP_SUMMARY_QUERY = None
+    JP_SUMMARY_QUERY_TECH = None
+    JP_SUMMARY_PROMPT_TMPL = None
+    JP_SUMMARY_PROMPT = None
+    JP_INSERT_PROMPT_TMPL = None
+    JP_INSERT_PROMPT = None
+    JP_KEYWORD_EXTRACT_TEMPLATE_TMPL = None
+    JP_KEYWORD_EXTRACT_TEMPLATE = None
 
-###############################################################
-# Evaluation Prompt Templates
-###############################################################
-JP_TEXT_QA_PROMPT_TMPL = (
-    "コンテキスト情報は以下の通りです。\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n\n"
-    "上記のコンテキスト情報を使用して、以下の質問に答えてください。\n"
-    "回答する際の注意事項:\n"
-    "- コンテキストに基づいた正確な回答をしてください\n"
-    "- コンテキストに情報がない場合は「提供された情報からは回答できません」と答えてください\n"
-    "- 回答は簡潔かつ明確にしてください\n"
-    "- 自然な日本語で回答してください\n\n"
-    "質問: {query_str}\n"
-    "回答: "
-)
-
-JP_TEXT_QA_PROMPT = PromptTemplate(
-    JP_TEXT_QA_PROMPT_TMPL, prompt_type=PromptType.QUESTION_ANSWER
-)
-
-JP_QUESTION_GENERATION_PROMPT = (
-    "コンテキスト情報は以下の通りです。\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n\n"
-    "上記のコンテキスト情報のみを基に、質問を生成してください\n\n"
-    "## 質問を生成する際の注意事項\n"
-    "1. 質問はコンテキストから直接回答できるものにしてください。\n"
-    "2. 質問は具体的で明確なものにしてください\n"
-    "3. 質問は以下のような多様性を持たせてください\n"
-    "   1. 事実確認の質問（「～は何ですか？」「～はいつですか？」）\n"
-    "   2. 理由・説明の質問（「なぜ～ですか？」「どのように～ですか？」）\n"
-    "   3. 比較の質問（「～と～の違いは何ですか？」）\n"
-    "   4. 評価の質問（「～の利点は何ですか？」）\n\n"
-    "4. 各質問は独立した行に記述してください\n"
-    "5. 質問文は自然な日本語で記述してください\n\n"
-    "質問:{query_str}"
-)
-
-
-JP_QUESTION_GEN_QUERY = (
-    "あなたはテストデータセット生成のための教師です。\n"
-    "与えられた文書から、理解度を測るための{num_questions_per_chunk}個の質問を生成してください。\n"
-    "## 質問は以下の要件を満たす必要があります\n"
-    "- コンテキストに含まれる具体的な情報に基づいていること\n"
-    "- コンテキストから直接回答できる質問であること\n"
-    "- 明確で曖昧さのない表現を使用すること\n"
-    "- コンテキストに記載されていない外部知識を必要としないこと\n"
-    "- 以下のような多様な観点からの質問を含めること\n"
-    "   1. 事実確認の質問（「～は何ですか？」「～はいつですか？」）\n"
-    "   2. 理由・説明の質問（「なぜ～ですか？」「どのように～ですか？」）\n"
-    "   3. 比較の質問（「～と～の違いは何ですか？」）\n"
-    "   4. 評価の質問（「～の利点は何ですか？」）\n\n"
-    "## 質問は必ず以下の形式で出力してください\n"
-    "1. [質問文]\n"
-    "2. [質問文]\n"
-    "3. [質問文]\n"
-)
-
-JP_EVAL_TEMPLATE = PromptTemplate(
-    "以下の情報がコンテキストによって支持されているかどうかを判断してください。\n"
-    "回答は必ず YES または NO のいずれかで行ってください。\n"
-    "たとえ大部分のコンテキストが無関係であっても、コンテキストのいずれかの部分が情報を支持していれば YES と答えてください。\n"
-    "以下に例を示します。\n\n"
-    "情報: アップルパイは一般的に二重のクラスト（上と下の生地）を持つ。\n"
-    "コンテキスト: アップルパイは主要な具材がリンゴのフルーツパイです。\n"
-    "アップルパイはしばしばホイップクリームやアイスクリーム（'apple pie à la mode'）、カスタード、チェダーチーズとともに提供されます。\n"
-    "一般的に上と下の生地の両方があり、上のクラストは閉じているか格子模様です。\n"
-    "回答: YES\n"
-    "情報: アップルパイはまずい。\n"
-    "コンテキスト: アップルパイは主要な具材がリンゴのフルーツパイです。\n"
-    "アップルパイはしばしばホイップクリームやアイスクリーム（'apple pie à la mode'）、カスタード、チェダーチーズとともに提供されます。\n"
-    "一般的に上と下の生地の両方があり、上のクラストは閉じているか格子模様です。\n"
-    "回答: NO\n"
-    "情報: {query_str}\n"
-    "コンテキスト: {context_str}\n"
-    "回答: "
-)
-
-JP_REFINE_TEMPLATE = PromptTemplate(
-    "次の情報がコンテキストに含まれているか確認してください: {query_str}\n"
-    "既に YES/NO の回答があります: {existing_answer}\n"
-    "以下の追加コンテキストを使って、必要なら既存の回答を修正してください。\n"
-    "------------\n"
-    "{context_msg}\n"
-    "------------\n"
-    "既存の回答が既に YES であれば、引き続き YES としてください。新しいコンテキストに情報が含まれていれば YES、そうでなければ NO と回答してください。\n"
-)
+TemplatePromptSettings = _TemplatePromptSettings()

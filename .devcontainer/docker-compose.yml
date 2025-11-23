@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   app:
     image: python3.12:dev
@@ -8,3 +9,9 @@ services:
       - ..:/workspace
     working_dir: /workspace
     command: sleep infinity
+    networks:
+      - llamaindex_store_network
+
+networks:
+  llamaindex_store_network:
+    external: true

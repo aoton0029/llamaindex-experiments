@@ -7,21 +7,22 @@ import os
 from pathlib import Path
 import pandas as pd
 from llama_index.core import Settings, StorageContext
+from llama_index.core.node_parser import NodeParser
 from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms.llm import BaseLLM
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 from llama_index.core.schema import Document
 from db.database_manager import DatabaseConfig, DatabaseManager
-from services import ConfigManager
-from experiment_monitor import ExperimentMonitor, ExperimentMetrics
+from services.config_manager import ConfigManager
+from test_runner_base import TestRunnerBase
+from factories.template_prompts import TemplatePromptSettings
 from factories import (
     LLMFactory, 
     EmbeddingFactory, 
     DocumentLoader, 
     ChunkerFactory, 
     IndexBuilderFactory, 
-    BaseChunker, 
     SchemaBuilder,
     IndexBuilder,
     RagasDatasetFactory,
@@ -40,7 +41,7 @@ llamadebughandler = LlamaDebugHandler()
 callback_manager = CallbackManager([llamadebughandler])
 Settings.callback_manager = callback_manager
 
-class ExperimentResult(BaseModel):
+class EvaluationTestResult(BaseModel):
     success: bool
     message: str
     data: Dict[str, Any]
@@ -49,29 +50,30 @@ class ExperimentResult(BaseModel):
     end_time: Optional[str] = None
     duration_seconds: Optional[float] = None
 
-class ExperimentRunner:
-    def __init__(self, config_dir: str, data_dir: str, result_dir: str):
-        self.config_dir = config_dir
-        self.data_dir = data_dir
-        self.result_dir = result_dir
-        self.config_manager = ConfigManager(config_dir)
-        self.monitor = ExperimentMonitor(result_dir)
-
-    def run_all_experiments(self):
+class EvaluationTestRunner(TestRunnerBase):
+    """評価テストを実行するクラス"""
+    
+    def run_all_tests(self) -> List[EvaluationTestResult]:
+        """全ての評価テスト実験を実行"""
         self.config_manager.load_all_configs()
-        experiments: Dict[str, Any] = self.config_manager.get_config("test_patterns")
-        results: List[ExperimentResult] = []
+        
+        # テンプレートプロンプトを初期化
+        TemplatePromptSettings.initialize(self.config_manager)
+        TemplatePromptSettings._load_templates()
+        
+        experiments: Dict[str, Any] = self.config_manager.get_evaluation_test_patterns()
+        results: List[EvaluationTestResult] = []
         
         for experiment_name, experiment_config in experiments.items():
             if not experiment_config.get("enabled", True):
                 logger.info(f"Skipping disabled experiment: {experiment_name}")
                 continue
             try:
-                result = self.run_experiment(experiment_name)
+                result = self.run_test(experiment_name)
                 results.append(result)
             except Exception as e:
                 logger.error(f"Experiment failed: {e}")
-                results.append(ExperimentResult(
+                results.append(EvaluationTestResult(
                     success=False, 
                     message=str(e), 
                     data={},
@@ -79,33 +81,37 @@ class ExperimentRunner:
                 ))
         
         # 全実験の統合サマリーを作成
-        self._create_all_experiments_summary(results)
+        self._create_all_tests_summary(results)
         
         return results
 
-    def run_experiment(self, pattern_name: str):
+    def run_test(self, pattern_name: str) -> EvaluationTestResult:
         # 指定された実験パターンを実行
-        exp_patterns = self.config_manager.get_experiment_pattern(pattern_name)
-        tokenizer_config = self.config_manager.get_tokenizer_config_pattern(pattern_name)
-        chunking_config = self.config_manager.get_chunking_config_pattern(pattern_name)
-        llm_config = self.config_manager.get_llm_config_pattern(pattern_name)
-        embedding_config = self.config_manager.get_embedding_config_pattern(pattern_name)
-        
+        pattern = self.config_manager.get_test_pattern(pattern_name, "evaluation")
         
         # 実験開始
-        experiment_id = self.monitor.start_experiment(pattern_name, exp_patterns)
+        experiment_id = self.monitor.start_test(pattern_name, pattern)
         
         try:
+            # テンプレートプロンプト情報を記録
+            self.monitor.log_event("setup", "Recording template prompts")
+            experiment_dir = self.monitor.get_test_dir()
+            template_info = TemplatePromptSettings.get_templates_info()
+            self._save_phase_result(experiment_dir, "phase0_template_prompts", template_info)
+            
             # トークナイザーの設定
             self.monitor.log_event("setup", "Setting up tokenizer")
+            tokenizer_config = self.config_manager.get_tokenizer_config_from_pattern(pattern_name, "evaluation")
             Settings.tokenizer = self._setup_tokenizer(tokenizer_config)
             
             # LLMの設定
             self.monitor.log_event("setup", "Setting up LLM")
+            llm_config = self.config_manager.get_llm_config_from_pattern(pattern_name, "evaluation")
             Settings.llm = self._setup_llm(llm_config)
             
             # 埋め込みモデルの設定
             self.monitor.log_event("setup", "Setting up embedding model")
+            embedding_config = self.config_manager.get_embedding_config_from_pattern(pattern_name, "evaluation")
             Settings.embed_model, dim = self._setup_embedding(embedding_config)
             
             # スキーマの設定
@@ -153,21 +159,24 @@ class ExperimentRunner:
             for idx, documents in enumerate(all_documents):
                 self.monitor.log_event("indexing", f"Processing document set {idx+1}/{len(all_documents)}")
 
-                # チャンク化を実行
-                chunker = self._setup_chunker(chunking_config)
-                nodes = chunker.chunk_documents(documents)
-                
-                # インデックスを構築（同一StorageContextに追加）
-                index_builder = self._setup_indexbuilder(
-                    exp_patterns['indexing_config'],
-                    storage_context=storage_context
-                )
-                index = index_builder.build_from_nodes(nodes)
-                indices.append(index)
+                for configs in self.config_manager.get_indexing_strategy_from_pattern(pattern_name, "evaluation"): 
+                    chunking_config = self.config_manager.get_chunking_config(configs["chunking_config_model"])
+                    indexing_type = configs["indexing_config_model"]
+                    # チャンク化を実行
+                    chunker = self._setup_chunker(chunking_config)
+                    nodes = chunker.get_nodes_from_documents(documents)
+                    
+                    # インデックスを構築（同一StorageContextに追加）
+                    index_builder = self._setup_indexbuilder(
+                        indexing_type,
+                        storage_context=storage_context
+                    )
+                    index = index_builder.build_from_nodes(nodes)
+                    indices.append(index)
 
-                total_nodes += len(nodes)
-                total_docs += len(documents)
-                all_docs_flat.extend(documents)
+                    total_nodes += len(nodes)
+                    total_docs += len(documents)
+                    all_docs_flat.extend(documents)
             
             indexing_duration = (datetime.now() - indexing_start).total_seconds()
             self.monitor.log_event(
@@ -189,8 +198,9 @@ class ExperimentRunner:
             integrated_eval_result = None
             if indices:
                 self.monitor.log_event("evaluation", "Starting integrated evaluation with all indices")
+                evaluation_strategy = self.config_manager.get_evaluation_strategy_from_pattern(pattern_name, "evaluation")
                 integrated_eval_result = self._evaluate_index(
-                    exp_patterns['evaluation_config'],
+                    evaluation_strategy,
                     index=indices[-1],
                     documents=all_docs_flat,
                 )
@@ -209,33 +219,34 @@ class ExperimentRunner:
                 "total_nodes": total_nodes,
                 "total_indices": len(indices),
                 "pattern": pattern_name,
-                "config": exp_patterns,
+                "config": pattern,
+                "template_prompts": template_info,
                 "evaluation_results": integrated_eval_result
             }
             
-            self.monitor.end_experiment(True, result_data)
+            self.monitor.end_test(True, result_data)
             
-            return ExperimentResult(
+            return EvaluationTestResult(
                 success=True, 
                 message="Experiment completed successfully.",
                 data=result_data,
                 experiment_id=experiment_id,
-                start_time=self.monitor.start_time.isoformat()
+                start_time=self.monitor.start_time.isoformat() if self.monitor.start_time else None
             )
             
         except Exception as e:
             logger.error(f"Experiment error: {e}", exc_info=True)
             self.monitor.log_event("error", str(e))
-            self.monitor.end_experiment(False, {"error": str(e)})
+            self.monitor.end_test(False, {"error": str(e)})
             
-            return ExperimentResult(
+            return EvaluationTestResult(
                 success=False,
                 message=str(e),
                 data={},
                 experiment_id=experiment_id
             )
     
-    def _create_all_experiments_summary(self, results: List[ExperimentResult]):
+    def _create_all_tests_summary(self, results: List[EvaluationTestResult]):
         """全実験の統合サマリーを作成"""
         summary_path = Path(self.result_dir) / "all_experiments_summary.json"
         
@@ -263,88 +274,6 @@ class ExperimentRunner:
         csv_path = Path(self.result_dir) / "all_experiments_summary.csv"
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
-
-    def _setup_llm(self, llm_config: Dict[str, Any]):
-        try:
-            self.monitor.log_event("setup", "Setting up LLM...")
-            backend = llm_config["backend"]
-            base_url = llm_config["base_url"]
-            model_name = llm_config["model_name"]
-            
-            llm = LLMFactory.create(
-                backend=backend,
-                model_name=model_name,
-                base_url=base_url,
-                **llm_config.get("kwargs", {})
-            )
-
-            self.monitor.log_event("setup", f"Set up LLM: {model_name}")
-            return llm
-        except Exception as e:
-            logger.error(f"LLM setup failed: {e}")
-            raise
-
-    def _setup_embedding(self, embedding_config: Dict[str, Any]) -> Tuple[BaseEmbedding, int]:
-        try:
-            self.monitor.log_event("setup", "Setting up embedding model...")
-            backend = embedding_config["backend"]
-            model_name = embedding_config["model_name"]
-            base_url = embedding_config["base?url"]
-            dim = embedding_config["dimensions"]
-
-            embedding = EmbeddingFactory.create(
-                backend=backend,
-                model_name=model_name,
-                base_url=base_url,
-                **embedding_config.get("kwargs", {})
-            )
-            self.monitor.log_event("setup", f"Set up embedding model: {model_name}")
-            return embedding, dim
-        except Exception as e:
-            logger.error(f"Embedding model setup failed: {e}")
-            raise
-
-    def _setup_tokenizer(self, tokenizer_config: Dict[str, Any]):
-        try:
-            self.monitor.log_event("setup", "Setting up tokenizer...")
-            model_name = tokenizer_config["model_name"]
-            tokenizer = AutoTokenizer.from_pretrained(**tokenizer_config['kwargs'])
-            self.monitor.log_event("setup", f"Set up tokenizer: {model_name}")
-            return tokenizer
-        except Exception as e:
-            logger.error(f"Tokenizer setup failed: {e}")
-            raise
-
-    def _setup_indexbuilder(self, pattern_config: Dict[str, Any], storage_context: StorageContext) -> IndexBuilder:
-        try:
-            self.monitor.log_event("setup", "Setting up index builder...")
-            builder_type = pattern_config.get("type")
-            index_builder = IndexBuilderFactory.create(
-                builder_type=builder_type,
-                storage_context=storage_context,
-                show_progress=True, 
-                **pattern_config.get("kwargs", {})
-            )
-            self.monitor.log_event("setup", f"Set up index builder: {builder_type}")
-            return index_builder
-        except Exception as e:
-            logger.error(f": {e}")
-            raise
-
-    def _setup_chunker(self, chunking_config: Dict[str, Any]) -> BaseChunker:
-        try:
-            self.monitor.log_event("setup", "Setting up chunker...")
-            chunker_type = chunking_config['type']
-            chunker = ChunkerFactory.create(
-                chunker_type=chunker_type,
-                **chunking_config.get("kwargs", {})
-            )
-            self.monitor.log_event("setup", f"Set up chunker: {chunker_type}")
-            return chunker
-        except Exception as e:
-            logger.error(f"Chunker setup failed: {e}")
-            raise
-    
     
     def _evaluate_index(
         self,
