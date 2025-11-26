@@ -1,0 +1,29 @@
+services:
+  ollama:
+    image: ollama/ollama:0.12.3
+    container_name: ollama
+    restart: unless-stopped
+    ipc: host
+    shm_size: "4g"
+    ports:
+      - 11434:11434
+    volumes:
+      - ollama_storage:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - ollama-network
+
+networks:
+  ollama-network:
+    name: ollama-network
+    driver: bridge
+
+volumes:
+  ollama_storage:
+    driver: bridge

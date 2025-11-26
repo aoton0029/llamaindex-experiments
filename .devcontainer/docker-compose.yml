@@ -10,8 +10,17 @@ services:
     working_dir: /workspace
     command: sleep infinity
     networks:
-      - llamaindex_store_network
+      - python-dev-network
+      - ollama-network
+      - store_network
+      - vllm-network
+      - langfuse-network
 
 networks:
-  llamaindex_store_network:
-    external: true
+  python-dev-network:
+    name: python-dev-network
+    driver: bridge
+  ollama-network:
+  store_network:
+  vllm-network:
+  langfuse-network:

@@ -64,6 +64,7 @@ llama-index-tools-requests
 llama-index-tools-mcp
 llama-index-multi-modal-llms-ollama
 llama-index-multi-modal-llms-openai-like
+llama-index-callbacks-langfuse
 torch
 torchvision
 torchaudio
