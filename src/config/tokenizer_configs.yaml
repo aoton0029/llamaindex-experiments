@@ -1,14 +1,25 @@
 
-tokenizer_types:
-  huggingface_qwen:
+tokenizer_config_models:
+  hf_qwen:
     type: "huggingface"
-    model_name: "Qwn3/Qwen3-32B" 
+    model_name: "Qwen3/Qwen3-32B" 
     kwargs:
-      pretrained_model_name_or_path: "models/Qwen3/Qwen3-32B"
+      pretrained_model_name_or_path: "/llm_models/Qwen3/Qwen3-32B"
+  
+  hf_qwen32_awq:
+    type: "huggingface"
+    model_name: "Qwen3/Qwen3-32B-AWQ"
+    kwargs:
+      pretrained_model_name_or_path: "/llm_models/Qwen3/Qwen3-32B-AWQ"
 
-  huggingface_ruri_v3_310m:
+  hf_ruri_v3_310m:
     type: "huggingface"
     model_name: "cl-nagoya/ruri-v3-310m"
     kwargs:
-      pretrained_model_name_or_path: "models/Ruri/Ruri-V3-310M"
+      pretrained_model_name_or_path: "/llm_models/Ruri/Ruri-V3-310M"
 
+  hf_elyza_8b_awq:
+    type: "huggingface"
+    model_name: "Elyza/Llama-3-ELYZA-JP-8B-AWQ"
+    kwargs:
+      pretrained_model_name_or_path: "/llm_models/Llama-3-ELYZA-JP-8B-AWQ"
