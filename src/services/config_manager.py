@@ -12,10 +12,9 @@ class ConfigPaths(BaseModel):
     llm: str
     tokenizer: str
     evaluation: str
-    schemas: str
+    # schemas: str
     extractor: str
     templates: str
-    chunk_test_patterns: str
     evaluation_test_patterns: str
     extractor_test_patterns: str
 
@@ -30,7 +29,7 @@ class ConfigManager:
             llm=str(self.config_dir / "llm_configs.yaml"),
             tokenizer=str(self.config_dir / "tokenizer_configs.yaml"),
             evaluation=str(self.config_dir / "evaluation_configs.yaml"),
-            schemas=str(self.config_dir / "schema_config.yaml"),
+            # schemas=str(self.config_dir / "schema_config.yaml"),
             extractor=str(self.config_dir / "extractor_configs.yaml"),
             templates=str(self.config_dir / "templates.yaml"),
             evaluation_test_patterns=str(Path(config_dir).parent / "tests" / "evaluation_test_patterns.yaml"),
@@ -60,7 +59,7 @@ class ConfigManager:
             "llm": self.load_yaml(self.paths.llm),
             "tokenizer": self.load_yaml(self.paths.tokenizer),
             "evaluation": self.load_yaml(self.paths.evaluation),
-            "schema": self.load_yaml(self.paths.schemas),
+            # "schema": self.load_yaml(self.paths.schemas),
             "extractor": self.load_yaml(self.paths.extractor),
             "templates": self.load_yaml(self.paths.templates),
             "evaluation_test_patterns": self.load_yaml(self.paths.evaluation_test_patterns),
@@ -107,10 +106,10 @@ class ConfigManager:
         cfg_models = config.get("evaluation_config_models", {})
         return cfg_models.get(type_name, {})
     
-    def get_schema_config(self, type_name: str) -> Dict[str, Any]:
-        config = self.get_config("schema")
-        cfg_models = config.get("schema_config_models", {})
-        return cfg_models.get(type_name, {})
+    # def get_schema_config(self, type_name: str) -> Dict[str, Any]:
+    #     config = self.get_config("schema")
+    #     cfg_models = config.get("schema_config_models", {})
+    #     return cfg_models.get(type_name, {})
     
     def get_indexing_config(self, type_name: str) -> Dict[str, Any]:
         config = self.get_config("indexing")
