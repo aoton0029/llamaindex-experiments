@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Dict
 from llama_index.core import Settings
 from llama_index.core.prompts import SelectorPromptTemplate
 from llama_index.core.prompts.base import PromptTemplate
@@ -14,25 +14,24 @@ class _TemplatePromptSettings:
     デフォルトはNone（LlamaIndexのデフォルトを使用）。
     YAMLファイルから設定を読み込んでオーバーライドできる。
     """
-    
-    _config_manager: Optional[object] = None
+    _configs: Optional[Dict[str, Any]] = None
     _templates_loaded: bool = False
     
     @classmethod
-    def initialize(cls, config_manager: Optional[object] = None):
+    def initialize(cls, configs: Optional[Dict[str, Any]] = None):
         """ConfigManagerを設定してテンプレートを初期化"""
-        cls._config_manager = config_manager
         cls._templates_loaded = False
-    
+        cls._configs = configs
+        cls._load_templates()
+
     @classmethod
     def _load_templates(cls):
         """YAMLからテンプレートを読み込み"""
-        if cls._templates_loaded or cls._config_manager is None:
+        if cls._templates_loaded or cls._configs is None:
             return
         
         try:
-            templates = cls._config_manager.get_template_prompts()
-            
+            templates = cls._configs#.get("template_prompts", {})
             # 各カテゴリのテンプレートをオーバーライド
             if "simple_input" in templates:
                 simple_input = templates["simple_input"]
@@ -68,12 +67,14 @@ class _TemplatePromptSettings:
             
             if "extractor" in templates:
                 extractor = templates["extractor"]
-                if "jp_title_node_template" in extractor:
-                    cls.JP_TITLE_NODE_TEMPLATE = extractor["jp_title_node_template"]
-                if "jp_title_combine_template" in extractor:
-                    cls.JP_TITLE_COMBINE_TEMPLATE = extractor["jp_title_combine_template"]
-                if "jp_summary_extract_template" in extractor:
-                    cls.JP_SUMMARY_EXTRACT_TEMPLATE = extractor["jp_summary_extract_template"]
+                if "jp_title_node_template_tmpl" in extractor:
+                    cls.JP_TITLE_NODE_TEMPLATE = extractor["jp_title_node_template_tmpl"]
+                if "jp_title_combine_template_tmpl" in extractor:
+                    cls.JP_TITLE_COMBINE_TEMPLATE = extractor["jp_title_combine_template_tmpl"]
+                if "jp_summary_extract_template_tmpl" in extractor:
+                    cls.JP_SUMMARY_EXTRACT_TEMPLATE = extractor["jp_summary_extract_template_tmpl"]
+                if "jp_keyword_extract_template_tmpl" in extractor:
+                    cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL = extractor["jp_keyword_extract_template_tmpl"]
                 if "jp_question_gen_tmpl" in extractor:
                     cls.JP_QUESTION_GEN_TMPL = extractor["jp_question_gen_tmpl"]
             
@@ -95,8 +96,6 @@ class _TemplatePromptSettings:
                     cls.JP_SUMMARY_PROMPT_TMPL = evaluation["jp_summary_prompt_tmpl"]
                 if "jp_insert_prompt_tmpl" in evaluation:
                     cls.JP_INSERT_PROMPT_TMPL = evaluation["jp_insert_prompt_tmpl"]
-                if "jp_keyword_extract_template_tmpl" in evaluation:
-                    cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL = evaluation["jp_keyword_extract_template_tmpl"]
             
             # プロンプトオブジェクトを再生成
             cls._regenerate_prompts()
@@ -136,7 +135,7 @@ class _TemplatePromptSettings:
         
         if cls.JP_EVAL_TEMPLATE_TMPL is not None:
             cls.JP_EVAL_TEMPLATE = PromptTemplate(
-                cls.JP_EVAL_TEMPLATE_TMPL, prompt_type=PromptType.EVAL
+                cls.JP_EVAL_TEMPLATE_TMPL, prompt_type=PromptType.SIMPLE_INPUT
             )
         
         if cls.JP_REFINE_TEMPLATE_TMPL is not None:
@@ -204,6 +203,7 @@ class _TemplatePromptSettings:
                 "title_combine": cls.JP_TITLE_COMBINE_TEMPLATE,
                 "summary_extract": cls.JP_SUMMARY_EXTRACT_TEMPLATE,
                 "question_gen": cls.JP_QUESTION_GEN_TMPL,
+                "keyword_extract": cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
             },
             "evaluation": {
                 "question_generation": cls.JP_QUESTION_GENERATION_PROMPT,
@@ -214,7 +214,6 @@ class _TemplatePromptSettings:
                 "summary_query_tech": cls.JP_SUMMARY_QUERY_TECH,
                 "summary_prompt": cls.JP_SUMMARY_PROMPT_TMPL,
                 "insert_prompt": cls.JP_INSERT_PROMPT_TMPL,
-                "keyword_extract": cls.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
             }
         }
     
