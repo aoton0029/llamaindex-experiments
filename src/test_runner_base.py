@@ -1,12 +1,14 @@
+import sys
 import logging
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 from pathlib import Path
 from llama_index.core import Settings, StorageContext
 from llama_index.core.node_parser import NodeParser
 from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms.llm import BaseLLM
+from llama_index.core.extractors import BaseExtractor
 from transformers import AutoTokenizer
 from services.config_manager import ConfigManager
 from test_monitor import TestMonitor
@@ -21,7 +23,20 @@ from factories import (
     BasePreProcessor
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+    ]
+)
+
 logger = logging.getLogger(__name__)
+
+from llama_index.core.callbacks import LlamaDebugHandler, CallbackManager
+llamadebughandler = LlamaDebugHandler()
+callback_manager = CallbackManager([llamadebughandler])
+Settings.callback_manager = callback_manager
 
 
 class TestRunnerBase(ABC):
@@ -40,7 +55,7 @@ class TestRunnerBase(ABC):
             result_dir: 結果出力ディレクトリ
         """
         self.config_dir = config_dir
-        self.data_dir = data_dir
+        # self.data_dir = data_dir
         self.result_dir = result_dir
         self.config_manager = ConfigManager(config_dir)
         self.monitor = TestMonitor(result_dir)
@@ -140,18 +155,17 @@ class TestRunnerBase(ABC):
         """
         try:
             self.monitor.log_event("setup", "Setting up index builder...")
-            indexing_config = self.config_manager.get_config("indexing")
-            index_models = indexing_config.get("indexing_config_models", {})
-            pattern_config = index_models.get(indexing_type, {})
+            # indexing_config = self.config_manager.get_config("indexing")
+            # index_models = indexing_config.get("indexing_config_models", {})
+            # pattern_config = index_models.get(indexing_type, {})
             
-            builder_type = pattern_config.get("type")
+            # builder_type = pattern_config.get("type")
             index_builder = IndexBuilderFactory.create(
-                builder_type=builder_type,
+                builder_type=indexing_type,
                 storage_context=storage_context,
-                show_progress=True, 
-                **pattern_config.get("kwargs", {})
+                show_progress=True
             )
-            self.monitor.log_event("setup", f"Set up index builder: {builder_type}")
+            self.monitor.log_event("setup", f"Set up index builder: {indexing_type}")
             return index_builder
         except Exception as e:
             logger.error(f"Index builder setup failed: {e}")
@@ -180,7 +194,7 @@ class TestRunnerBase(ABC):
             logger.error(f"Chunker setup failed: {e}")
             raise
     
-    def _setup_extractors(self, extractor_configs: list) -> list:
+    def _setup_extractors(self, extractor_configs: list) -> List[BaseExtractor]:
         """
         複数のエクストラクタをセットアップ
         
@@ -265,4 +279,8 @@ class TestRunnerBase(ABC):
         Args:
             pattern_name: 実験パターン名
         """
+        pass
+
+    @abstractmethod
+    def run(self):
         pass
