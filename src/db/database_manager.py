@@ -65,60 +65,13 @@ class DatabaseManager:
         self._redis_client: Optional[RedisClient] = None
         self._milvus_client: Optional[MilvusClient] = None
         self._neo4j_client: Optional[Neo4jClient] = None
-        
-        # ストアインスタンス
-        self._docstore: Optional[BaseDocumentStore] = None
-        self._index_store: Optional[BaseIndexStore] = None
-        self._vector_store: Optional[VectorStore] = None
-        self._image_store: Optional[VectorStore] = None
-        self._graph_store: Optional[GraphStore] = None
-        self._storage_context: Optional[StorageContext] = None
     
-        self.milvus_vector_dim: int = None 
-        self.milvus_image_dim: int = None
-        self.milvus_vector_collection_name: str = None
-        self.milvus_image_collection_name: str = None
-        
     @classmethod
     def from_config_dict(cls, config_dict: Dict[str, Any]) -> 'DatabaseManager':
         config = DatabaseConfig(**config_dict)
         return cls(config)
     
-    def initialize(
-            self, 
-            milvus_vector_collection_name: str,
-            milvus_image_collection_name: str,
-            milvus_vector_collection_schema: CollectionSchema,
-            milvus_image_collection_schema: CollectionSchema,
-            milvus_vector_dim: int,
-            milvus_image_dim: int,
-            mongodb_namespace: str,
-            index_namespace: str,
-            recreate_collection: bool = False, 
-        ):        
-        self.disconnect_all()
-        self.connect_all()
-        # Mivusコレクション初期化
-        milvus = self.get_milvus_client()
-        milvus.create_collection(
-            milvus_vector_collection_name, 
-            milvus_vector_dim,
-            milvus_vector_collection_schema)
-        milvus.create_collection(
-            milvus_image_collection_name,
-            milvus_image_dim,
-            milvus_image_collection_schema
-        )
-        
-        # データ初期化
-        if recreate_collection:
-            self.drop_all_collections(
-                milvus_vector_collection_name=milvus_vector_collection_name,
-                milvus_image_collection_name=milvus_image_collection_name,
-                mongodb_namespace=mongodb_namespace,
-                index_namespace=index_namespace
-            )
-            self.connect_all()
+
     
     def get_mongodb_client(self) -> MongoDBClient:
         """MongoDBクライアントを取得"""
@@ -170,109 +123,69 @@ class DatabaseManager:
         namespace: str = "default",
         collection_name: str = "documents"
     ) -> BaseDocumentStore:
-        if self._docstore is None:
-            mongodb_client = self.get_mongodb_client()
-            self._docstore = mongodb_client.get_docstore(
-                namespace=namespace,
-                collection_name=collection_name
-            )
-        return self._docstore
+        """MongoDBベースのドキュメントストアを取得（毎回新規作成）"""
+        mongodb_client = self.get_mongodb_client()
+        return mongodb_client.get_docstore(
+            namespace=namespace,
+            collection_name=collection_name
+        )
     
     def get_index_store(
         self,
-        namespace: str ,
+        namespace: str,
         collection_suffix: str
     ) -> BaseIndexStore:
-        if self._index_store is None:
-            redis_client = self.get_redis_client()
-            self._index_store = redis_client.get_index_store(
-                namespace=namespace,
-                collection_suffix=collection_suffix
-            )
-        return self._index_store
+        """Redisベースのインデックスストアを取得（毎回新規作成）"""
+        redis_client = self.get_redis_client()
+        return redis_client.get_index_store(
+            namespace=namespace,
+            collection_suffix=collection_suffix
+        )
     
     def get_vector_store(
         self,
-        collection_name: Optional[str] = None,
-        dim: Optional[int] = None,
+        collection_name: str,
+        dim: int,
         **kwargs
     ) -> VectorStore:
-        if self._vector_store is None:
-            milvus_client = self.get_milvus_client()
-            self._vector_store = milvus_client.get_vector_store(
-                collection_name=collection_name or self.milvus_vector_collection_name,
-                dim=dim or self.milvus_vector_dim,
-                **kwargs
-            )
-        return self._vector_store
+        """Milvusベースのベクトルストアを取得（毎回新規作成）"""
+        milvus_client = self.get_milvus_client()
+        return milvus_client.get_vector_store(
+            collection_name=collection_name,
+            dim=dim,
+            **kwargs
+        )
 
     def get_image_store(
         self,
-        collection_name: Optional[str] = None,
-        dim: Optional[int] = None,
+        collection_name: str,
+        dim: int,
         **kwargs
-    ) -> VectorStore:
-        if self._image_store is None:
-            milvus_client = self.get_milvus_client()
-            self._image_store = milvus_client.get_vector_store(
-                collection_name=collection_name or self.milvus_image_collection_name,
-                dim=dim or self.milvus_image_dim,
-                **kwargs
-            )
-        return self._image_store
+    ) -> Optional[VectorStore]:
+        """Milvusベースの画像ストアを取得（毎回新規作成）"""
+        if collection_name is None:
+            return None
+        milvus_client = self.get_milvus_client()
+        return milvus_client.get_vector_store(
+            collection_name=collection_name,
+            dim=dim,
+            **kwargs
+        )
     
-
     def get_graph_store(
         self,
         node_label: str = "Entity",
         rel_type: str = "RELATED",
         **kwargs
     ) -> GraphStore:
-        if self._graph_store is None:
-            neo4j_client = self.get_neo4j_client()
-            self._graph_store = neo4j_client.get_graph_store(
-                node_label=node_label,
-                rel_type=rel_type,
-                **kwargs
-            )
-        return self._graph_store
-    
-    def get_storage_context(
-        self,
-        docstore_namespace: str,
-        index_namespace: str,
-        vector_collection: str,
-        image_collection: str,
-        graph_node_label: str = "Entity",
-        graph_rel_type: str = "RELATED"
-    ) -> StorageContext:
-        """
-        StorageContextを構築
+        """Neo4jベースのグラフストアを取得（毎回新規作成）"""
+        neo4j_client = self.get_neo4j_client()
+        return neo4j_client.get_graph_store(
+            node_label=node_label,
+            rel_type=rel_type,
+            **kwargs
+        )
         
-        Args:
-            docstore_namespace: ドキュメントストアの名前空間
-            index_namespace: インデックスストアの名前空間
-            vector_collection: ベクトルストアのコレクション名
-            image_collection: 画像ストアのコレクション名
-            graph_node_label: グラフストアのノードラベル
-            graph_rel_type: グラフストアのリレーションシップタイプ
-            
-        Returns:
-            StorageContext インスタンス
-        """
-        if self._storage_context is None:
-            self._storage_context = StorageContext.from_defaults(
-                docstore=self.get_docstore(namespace=docstore_namespace),
-                index_store=self.get_index_store(namespace=index_namespace, collection_suffix="index"),
-                vector_store=self.get_vector_store(collection_name=vector_collection),
-                image_store=self.get_image_store(collection_name=image_collection),
-                graph_store=self.get_graph_store(
-                    node_label=graph_node_label,
-                    rel_type=graph_rel_type
-                )
-            )
-        return self._storage_context
-    
     def connect_all(self) -> None:
         """全データベースに接続"""
         try:
@@ -309,14 +222,6 @@ class DatabaseManager:
             self._milvus_client.disconnect()
         if self._neo4j_client:
             self._neo4j_client.disconnect()
-        
-        # ストアインスタンスもクリア
-        self._docstore = None
-        self._index_store = None
-        self._vector_store = None
-        self._image_store = None
-        self._graph_store = None
-        self._storage_context = None
         
         logger.info("全データベース接続を切断しました")
     
@@ -360,23 +265,3 @@ class DatabaseManager:
         """コンテキストマネージャーの終了"""
         self.disconnect_all()
 
-    def drop_all_collections(self, 
-                             milvus_vector_collection_name: str,
-                             milvus_image_collection_name: str, 
-                             mongodb_namespace: str,
-                             index_namespace: str) -> None:
-        """全データベースのコレクションを削除"""
-        if self._mongodb_client:
-            self._mongodb_client.drop_collection(f"{mongodb_namespace}/data")
-            self._mongodb_client.drop_collection(f"{mongodb_namespace}/metadata")
-            self._mongodb_client.drop_collection(f"{mongodb_namespace}/ref_doc_info")
-
-        if self._redis_client:
-            self._redis_client.delete_key(index_namespace)
-        
-        if self._milvus_client:
-            self._milvus_client.drop_collection(milvus_vector_collection_name)
-            self._milvus_client.drop_collection(milvus_image_collection_name)
-        
-        if self._neo4j_client:
-            self._neo4j_client.clear_database()
