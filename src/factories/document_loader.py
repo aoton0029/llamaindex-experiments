@@ -23,7 +23,7 @@ class DocumentLoader():
             ".pdf": pymupdf4llm.LlamaMarkdownReader(),
             ".docx": DocxReader(),
             ".epub": EpubReader(),
-            ".md": MarkdownReader(),
+            ".md": MarkdownReader(separator="＞"),
             ".xlsx": PandasExcelReader(),
             ".xls": PandasExcelReader(),
         }
