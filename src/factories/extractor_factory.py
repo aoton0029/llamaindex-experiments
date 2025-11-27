@@ -148,11 +148,15 @@ class ExtractorFactory:
     
     @staticmethod
     def _create_title_extractor(nodes: int = 5):
+        """
+        
+        'document_title'
+        """
         try:
             extractor = TitleExtractor(
                 nodes = nodes,
-                default_title_node_template = TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
-                default_title_combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TEMPLATE
+                node_template = TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
+                combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TEMPLATE
             )
             logger.info("TitleExtractorを作成")
             return extractor
@@ -162,6 +166,10 @@ class ExtractorFactory:
     
     @staticmethod
     def _create_summary_extractor():
+        """
+        
+        'section_summary'
+        """
         try:
             extractor = SummaryExtractor(
                 prompt_template=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE
@@ -174,6 +182,10 @@ class ExtractorFactory:
     
     @staticmethod
     def _create_keyword_extractor(keywords: int = 10):
+        """
+        
+        'excerpt_keywords'
+        """
         try:
             extractor = KeywordExtractor(
                 prompt_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
