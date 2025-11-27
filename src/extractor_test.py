@@ -11,11 +11,9 @@ from llama_index.core import Settings
 from llama_index.core.schema import BaseNode
 from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 from llama_index.core.ingestion import IngestionPipeline
+
 from transformers import AutoTokenizer
 from factories.document_loader import DocumentLoader
-from factories.extractor_factory import ExtractorFactory
-from factories.chunking_factory import ChunkerFactory
-from factories.llm_factory import LLMFactory, EmbeddingFactory
 from factories.template_prompts import TemplatePromptSettings
 from services.config_manager import ConfigManager
 from test_runner_base import TestRunnerBase
@@ -411,12 +409,6 @@ class ExtractorTestRunner(TestRunnerBase):
 
 
 if __name__ == "__main__":
-    # ログ設定
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
     # パスの設定
     current_dir = Path(__file__).parent
     config_dir = current_dir / "config"
