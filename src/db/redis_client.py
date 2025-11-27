@@ -121,7 +121,7 @@ class RedisClient:
         """
         if self._index_store is None:
             client = self.get_client()
-            self._index_store = RedisIndexStore(
+            self._index_store = RedisIndexStore.from_redis_client(
                 redis_client=client,
                 namespace=namespace,
                 collection_suffix=collection_suffix
