@@ -20,7 +20,7 @@ llm_config_models:
     base_url: "http://vllm-llm:8000/v1"
     kwargs:
       temperature: 0.0
-      max_tokens: 1024
+      max_tokens: 2048
       timeout: 3600
 
   vllm_qwen3_vl_30b:
@@ -29,6 +29,25 @@ llm_config_models:
     base_url: "http://vllm-llm:8000/v1"
     kwargs:
       temperature: 0.0
-      # max_tokens: 1024
+      max_tokens: 2048
       timeout: 3600
+  
+  vllm_elyza_8b:
+    backend: "vllm"
+    model_name: "/models/Llama-3-ELYZA-JP-8B"
+    base_url: "http://vllm-llm:8000/v1"
+    kwargs:
+      temperature: 0.0
+      max_tokens: 2048
+      timeout: 3600
+
+  vllm_elyza_8b_awq:
+    backend: "vllm"
+    model_name: "/models/Llama-3-ELYZA-JP-8B-AWQ"
+    base_url: "http://vllm-llm:8000/v1"
+    kwargs:
+      temperature: 0.0
+      max_tokens: 2048
+      timeout: 3600
+
 
