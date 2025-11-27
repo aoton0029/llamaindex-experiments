@@ -123,6 +123,7 @@ class MilvusClient:
         self,
         collection_name: str,
         dim: int,
+        schema: Optional[CollectionSchema] = None,
         index_type: str = "IVF_FLAT",
         metric_type: str = "L2",
         nlist: int = 1024,
@@ -151,6 +152,7 @@ class MilvusClient:
                 self.create_collection(
                     collection_name=collection_name,
                     dim=dim,
+                    schema=schema,
                     index_type=index_type,
                     metric_type=metric_type,
                     nlist=nlist
