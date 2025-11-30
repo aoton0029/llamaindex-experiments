@@ -1,0 +1,1 @@
+wsl sh up_all.sh

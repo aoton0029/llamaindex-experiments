@@ -17,7 +17,8 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-
+    networks:
+      - store-network
 
   minio:
     container_name: milvus-minio
@@ -36,7 +37,8 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-
+    networks:
+      - store-network
 
   milvus:
     container_name: milvus
@@ -68,7 +70,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-
+    networks:
+      - store-network
 
   mongodb:
     image: mongo:7
@@ -86,6 +89,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - store-network
 
   mongo-express:
     image: mongo-express:latest
@@ -102,7 +107,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-
+    networks:
+      - store-network
 
   redis:
     image: redis:7-alpine
@@ -128,7 +134,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-  
+    networks:
+      - store-network
+
   redisinsight:
     image: redislabs/redisinsight:latest
     container_name: redisinsight
@@ -141,7 +149,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-
+    networks:
+      - store-network
 
   neo4j:
     image: neo4j:2025.08.0-community
@@ -166,11 +175,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - store-network
 
 
 networks:
-  default:
-    name: store_network
+  store-network:
+    name: store-network
     driver: bridge
       
 volumes:

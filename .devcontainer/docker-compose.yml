@@ -12,7 +12,7 @@ services:
     networks:
       - python-dev-network
       - ollama-network
-      - store_network
+      - store-network
       - vllm-network
       - langfuse-network
 
@@ -21,6 +21,10 @@ networks:
     name: python-dev-network
     driver: bridge
   ollama-network:
-  store_network:
+    external: true
+  store-network:
+    external: true
   vllm-network:
+    external: true
   langfuse-network:
+    external: true

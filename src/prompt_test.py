@@ -83,7 +83,7 @@ def main():
     # LLM設定（環境に応じて変更してください）
     backend = "vllm" 
     model_name = "/models/Llama-3-ELYZA-JP-8B-AWQ"
-    base_url = "http://vllm-llm:8000/v1"
+    base_url = "http://vllm:8000/v1"
     
     print("LLMの初期化中...")
     try:
