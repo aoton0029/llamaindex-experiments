@@ -1,0 +1,85 @@
+# filepath: d:\開発\noto\llamaindex-experiments-main\llamaindex-experiments-main\src\tests\store_domain_patterns.yaml
+# ドメインデータストアテストパターン
+
+# グロッサリー用語の保存パターン
+store_glossary_basic:
+  enabled: true
+  name: "基本グロッサリー保存"
+  description: "グロッサリー用語をベクトルストアとサマリーインデックスに保存"
+  llm_config_model: "vllm_qwen3_32b_awq"
+  tokenizer_config_model: "hf_qwen32_awq"
+  embedding_config_model: "ollama_qwen3"
+  storage_config:
+    context_name: "glossary"
+    vector_store:
+      collection_name: "glossary_terms"
+      metric_type: "IP"
+      index_type: "HNSW"
+      additional_params: {}
+    docstore:
+      namespace: "glossary_db"
+      collection_name: "glossary_documents"
+    index_store:
+      namespace: "glossary_index"
+      collection_suffix: "glossary"
+  indexing_pattern:
+    - type: "vector"
+      chunking_config_model: "sentence_based_middle"
+      extractor_pattern: "pattern_title_summary_keyword"
+    - type: "summary"
+      chunking_config_model: "sentence_based_large"
+      extractor_pattern: "pattern_full"
+  query_config:
+    similarity_top_k: 10
+    response_mode: "compact"
+    streaming: true
+    node_postprocessors:
+      - type: "similarity_cutoff"
+        cutoff: 0.65
+      - type: "keyword_filter"
+        required_keywords: []
+  data_source:
+    type: "markdown"
+    directory: "datas/glossary/terms"
+    file_pattern: "*.md"
+
+# 技術コラム用語の保存パターン
+store_tech_column_basic:
+  enabled: true
+  name: "基本技術コラム保存"
+  description: "技術コラムをベクトルストアとサマリーインデックスに保存"
+  tokenizer_config_model: "hf_qwen32_awq"
+  embedding_config_model: "ollama_qwen3"
+  llm_config_model: "vllm_qwen3_32b_awq"
+  storage_config:
+    context_name: "tech_column"
+    vector_store:
+      collection_name: "tech_column_terms"
+      metric_type: "IP"
+      index_type: "HNSW"
+      additional_params: {}
+    docstore:
+      namespace: "tech_column_db"
+      collection_name: "tech_column_documents"
+    index_store:
+      namespace: "tech_column_index"
+      collection_suffix: "tech_column"
+  indexing_pattern:
+    - type: "vector"
+      chunking_config_model: "sentence_based_middle"
+      extractor_pattern: "pattern_title_summary_keyword"
+    - type: "summary"
+      chunking_config_model: "sentence_based_large"
+      extractor_pattern: "pattern_full"
+  query_config:
+    similarity_top_k: 8
+    response_mode: "tree_summarize"
+    streaming: true
+    node_postprocessors:
+      - type: "similarity_cutoff"
+        cutoff: 0.6
+      - type: "rerank"
+        top_n: 5
+  data_source:
+    directory: "datas/tech_column/terms"
+    file_pattern: "*.md"
