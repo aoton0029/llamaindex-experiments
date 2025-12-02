@@ -232,87 +232,6 @@ class CompositePreProcessor(BasePreProcessor):
         
         return result
 
-
-class SchemaBasedMetadataPreProcessor(BasePreProcessor):
-    """スキーマ定義に基づいてメタデータを整形する前処理"""
-    
-    def __init__(self, 
-                 schema_config: List[Dict[str, Any]],
-                 strict_mode: bool = False,
-                 fill_missing: bool = True,
-                 validate_types: bool = True):
-        """
-        Args:
-            schema_config: スキーマ設定（schema_config.yamlから読み込み）
-            strict_mode: 厳格モード（スキーマにないフィールドを削除）
-            fill_missing: 欠損フィールドをデフォルト値で埋める
-            validate_types: 型検証を行う
-        """
-        self.schema_config = schema_config
-        self.strict_mode = strict_mode
-        self.fill_missing = fill_missing
-        self.validate_types = validate_types
-        
-        # スキーマからフィールド情報を抽出
-        self.schema_fields = self._parse_schema_config(schema_config)
-    
-    def _parse_schema_config(self, schema_config: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """スキーマ設定を解析してフィールド情報を抽出"""
-        fields = {}
-        for field in schema_config:
-            field_name = field.get("name")
-            field_dtype = field.get("dtype", "VARCHAR")
-            field_max_length = field.get("max_length")
-            
-            fields[field_name] = {
-                "dtype": field_dtype,
-                "max_length": field_max_length,
-                "default": self._get_default_value(field_dtype)
-            }
-        
-        return fields
-    
-    def _get_default_value(self, dtype: str) -> Any:
-        """データ型に応じたデフォルト値を返す"""
-        dtype_defaults = {
-            "VARCHAR": "",
-            "INT64": 0,
-            "FLOAT": 0.0,
-            "BOOL": False,
-        }
-        return dtype_defaults.get(dtype.upper(), None)
-    
-    def _validate_and_convert_value(self, value: Any, field_info: Dict[str, Any]) -> Any:
-        """値を検証して適切な型に変換"""
-        dtype = field_info["dtype"].upper()
-        max_length = field_info.get("max_length")
-        
-        # 型変換
-        if dtype == "VARCHAR":
-            value = str(value) if value is not None else ""
-            # 最大長チェック
-            if max_length and len(value) > max_length:
-                logger.warning(f"Value truncated to {max_length} characters")
-                value = value[:max_length]
-        
-        elif dtype == "INT64":
-            try:
-                value = int(value) if value is not None else 0
-            except (ValueError, TypeError):
-                logger.warning(f"Cannot convert {value} to INT64, using default")
-                value = 0
-        
-        elif dtype == "FLOAT":
-            try:
-                value = float(value) if value is not None else 0.0
-            except (ValueError, TypeError):
-                logger.warning(f"Cannot convert {value} to FLOAT, using default")
-                value = 0.0
-        
-        elif dtype == "BOOL":
-            value = bool(value) if value is not None else False
-        
-        return value
     
     def process(self, documents: Union[List[Document], List[List[Document]]]) -> List[Document]:
         """スキーマに基づいてメタデータを整形"""
@@ -362,53 +281,6 @@ class SchemaBasedMetadataPreProcessor(BasePreProcessor):
         return documents
 
 
-class MetadataFilterPreProcessor(BasePreProcessor):
-    """特定のメタデータフィールドのみを保持する前処理"""
-    
-    def __init__(self, 
-                 allowed_fields: Optional[List[str]] = None,
-                 excluded_fields: Optional[List[str]] = None):
-        """
-        Args:
-            allowed_fields: 保持するフィールドのリスト（指定した場合、これ以外は削除）
-            excluded_fields: 除外するフィールドのリスト
-        """
-        self.allowed_fields = set(allowed_fields) if allowed_fields else None
-        self.excluded_fields = set(excluded_fields) if excluded_fields else set()
-    
-    def process(self, documents: Union[List[Document], List[List[Document]]]) -> List[Document]:
-        """メタデータをフィルタリング"""
-        flat_docs = self._flatten_documents(documents)
-        processed_docs = []
-        
-        for doc in flat_docs:
-            new_metadata = {}
-            
-            for key, value in doc.metadata.items():
-                # 許可リストがある場合はそれに従う
-                if self.allowed_fields:
-                    if key in self.allowed_fields:
-                        new_metadata[key] = value
-                # 除外リストのみの場合
-                elif key not in self.excluded_fields:
-                    new_metadata[key] = value
-            
-            doc.metadata = new_metadata
-            processed_docs.append(doc)
-        
-        logger.info(f"{len(processed_docs)}件のドキュメントのメタデータをフィルタリング")
-        return processed_docs
-    
-    def _flatten_documents(self, documents: Union[List[Document], List[List[Document]]]) -> List[Document]:
-        """ネストされたドキュメントリストをフラット化"""
-        if not documents:
-            return []
-        
-        if isinstance(documents[0], list):
-            return [doc for sublist in documents for doc in sublist]
-        return documents
-
-
 class PreProcessorFactory:
     """前処理ファクトリー"""
     
@@ -428,10 +300,6 @@ class PreProcessorFactory:
         """
         if processor_type == "metadata":
             return MetadataPreProcessor(**kwargs)
-        elif processor_type == "schema_based":
-            return SchemaBasedMetadataPreProcessor(**kwargs)
-        elif processor_type == "metadata_filter":
-            return MetadataFilterPreProcessor(**kwargs)
         elif processor_type == "toc":
             return TOCPreProcessor(**kwargs)
         elif processor_type == "cleaner":
@@ -441,16 +309,3 @@ class PreProcessorFactory:
         else:
             raise ValueError(f"未知の前処理タイプ: {processor_type}")
     
-    @staticmethod
-    def create_schema_based_pipeline(schema_config: List[Dict[str, Any]]) -> CompositePreProcessor:
-        """スキーマベースの前処理パイプラインを作成"""
-        return CompositePreProcessor([
-            TextCleanerPreProcessor(),
-            TOCPreProcessor(remove_toc=True, extract_toc_as_metadata=True),
-            SchemaBasedMetadataPreProcessor(
-                schema_config=schema_config,
-                strict_mode=True,
-                fill_missing=True,
-                validate_types=True
-            )
-        ])
