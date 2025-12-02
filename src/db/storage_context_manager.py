@@ -221,40 +221,44 @@ class StorageContextManager:
         """作成済みのStorageContextを取得"""
         return self._storage_contexts.get(context_name)
     
-    def drop_storage_context(
-        self,
-        context_name: str,
-        vector_collection: str,
-        docstore_namespace: str,
-        index_namespace: str,
-        image_collection: Optional[str] = None
-    ) -> None:
+    def drop_storage_context_by_name(self, context_name: str) -> None:
         """
         StorageContextに関連するすべてのコレクションを削除
         
         Args:
             context_name: StorageContextの識別名
-            vector_collection: ベクトルストアのコレクション名
-            docstore_namespace: ドキュメントストアの名前空間
-            index_namespace: インデックスストアの名前空間
-            image_collection: 画像ストアのコレクション名
         """
+        config = self._storage_configs.get(context_name)
+        if not config:
+            logger.warning(f"StorageContextConfigが見つかりません: {context_name}")
+            return
+        self.drop_storage_context(config)
+
+    def drop_storage_context(self, config: StorageContextConfig) -> None:
+        """
+        StorageContextに関連するすべてのコレクションを削除
+
+        Args:
+            config: StorageContextConfigインスタンス
+        """
+        context_name = config.context_name
+
         # MongoDB collections
         mongodb_client = self.db_manager.get_mongodb_client()
-        mongodb_client.drop_collection(f"{docstore_namespace}/data")
-        mongodb_client.drop_collection(f"{docstore_namespace}/metadata")
-        mongodb_client.drop_collection(f"{docstore_namespace}/ref_doc_info")
-        
+        mongodb_client.drop_collection(f"{config.docstore.namespace}/data")
+        mongodb_client.drop_collection(f"{config.docstore.namespace}/metadata")
+        mongodb_client.drop_collection(f"{config.docstore.namespace}/ref_doc_info")
+
         # Redis keys
         redis_client = self.db_manager.get_redis_client()
-        redis_client.delete_key(index_namespace)
-        
+        redis_client.delete_key(f"{config.index_store.namespace}/data")
+
         # Milvus collections
         milvus_client = self.db_manager.get_milvus_client()
-        milvus_client.drop_collection(vector_collection)
-        if image_collection:
-            milvus_client.drop_collection(image_collection)
-        
+        milvus_client.drop_collection(f"{config.vector_store.collection_name}")
+        if config.image_store:
+            milvus_client.drop_collection(f"{config.image_store.collection_name}")
+
         # Neo4j (必要に応じて)
         # neo4j_client = self.db_manager.get_neo4j_client()
         # neo4j_client.clear_database()
