@@ -38,7 +38,7 @@ class DatabaseConfig:
     mongodb_password: Optional[str] = password
     
     # Redis設定
-    redis_host: str = "redis"
+    redis_host: str = "redis-store"
     redis_port: int = 6379
     redis_password: Optional[str] = password
     redis_db: int = 0
