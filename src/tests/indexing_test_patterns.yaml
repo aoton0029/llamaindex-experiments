@@ -1,0 +1,37 @@
+# インデクシングテストパターン
+
+# テストパターン1: 
+test_basic_vector:
+  enabled: true
+  name: "基本チャンキング + ベクトルインデックス"
+  description: "基本的なチャンキングとベクトルインデックスのテスト"
+  llm_config_model: "vllm_qwen3_32b_awq"
+  tokenizer_config_model: "hf_qwen32_awq"
+  embedding_config_model: "ollama_qwen3"
+  storage_config:
+    context_name: "indexing_test_vector"
+    vector_store:
+      collection_name: "test_vector"
+      metric_type: "IP"
+      index_type: "HNSW"
+      additional_params: {}
+    docstore:
+      namespace: "test_vector_db"
+      collection_name: "test_documents"
+    index_store:
+      namespace: "test_vector_index"
+      collection_suffix: "vector_test"
+  indexing_pattern:
+    - type: "vector"
+      chunking_config_model: "sentence_splitter"
+      extractor_pattern: "pattern_title_only"
+  query_config:
+    similarity_top_k: 5
+    response_mode: "tree_summarize"
+    streaming: false
+    node_postprocessors:
+      - type: "similarity_cutoff"
+        cutoff: 0.7
+  data_source:
+    directory: "/workspace/sample_data/pdf"
+    file_pattern: "*.pdf"
