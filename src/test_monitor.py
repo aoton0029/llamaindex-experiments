@@ -6,7 +6,6 @@ from pathlib import Path
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
-from llama_index.core import Settings, StorageContext
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +26,13 @@ class TestMonitor:
     def __init__(self, result_dir: str):
         self.result_dir = Path(result_dir)
         self.result_dir.mkdir(parents=True, exist_ok=True)
-        self.current_experiment_id: Optional[str] = None
-        self.current_experiment_dir: Optional[Path] = None
+        self.current_test_id: Optional[str] = None
+        self.current_test_dir: Optional[Path] = None
         self.metrics = TestMetrics()
         self.start_time: Optional[datetime] = None
         self.logs: List[Dict[str, Any]] = []
     
-    def start_test(self, experiment_name: str, config: Dict[str, Any]) -> str:
+    def start_test(self, test_name: str, config: Dict[str, Any]) -> str:
         """
         実験を開始し、ディレクトリ構造を作成
         
@@ -46,29 +45,29 @@ class TestMonitor:
         """
         self.start_time = datetime.now()
         timestamp = self.start_time.strftime("%Y%m%d_%H%M%S")
-        self.current_experiment_id = f"{experiment_name}_{timestamp}"
-        self.current_experiment_dir = self.result_dir / self.current_experiment_id
+        self.current_test_id = f"{test_name}_{timestamp}"
+        self.current_test_dir = self.result_dir / self.current_test_id
         
         # ディレクトリ構造を作成
-        (self.current_experiment_dir / "config").mkdir(parents=True, exist_ok=True)
-        (self.current_experiment_dir / "logs").mkdir(parents=True, exist_ok=True)
-        (self.current_experiment_dir / "metrics").mkdir(parents=True, exist_ok=True)
-        (self.current_experiment_dir / "results").mkdir(parents=True, exist_ok=True)
+        (self.current_test_dir / "config").mkdir(parents=True, exist_ok=True)
+        (self.current_test_dir / "logs").mkdir(parents=True, exist_ok=True)
+        (self.current_test_dir / "metrics").mkdir(parents=True, exist_ok=True)
+        (self.current_test_dir / "results").mkdir(parents=True, exist_ok=True)
         
         # 設定を保存
         self._save_config(config)
         
         # メタデータを保存
         metadata = {
-            "experiment_id": self.current_experiment_id,
-            "experiment_name": experiment_name,
+            "experiment_id": self.current_test_id,
+            "experiment_name": test_name,
             "start_time": self.start_time.isoformat(),
             "status": "running"
         }
-        self._save_json(metadata, self.current_experiment_dir / "metadata.json")
+        self._save_json(metadata, self.current_test_dir / "metadata.json")
         
-        logger.info(f"Started experiment: {self.current_experiment_id}")
-        return self.current_experiment_id
+        logger.info(f"Started experiment: {self.current_test_id}")
+        return self.current_test_id
     
     def log_event(self, event_type: str, message: str, data: Optional[Dict[str, Any]] = None):
         """イベントをログに記録"""
@@ -80,6 +79,56 @@ class TestMonitor:
         }
         self.logs.append(event)
         logger.info(f"[{event_type}] {message}")
+    
+    def log_document_metadata(self, file_path: str, documents: List[Any]):
+        """ドキュメントのメタデータをログに記録"""
+        doc_metadata = []
+        for idx, doc in enumerate(documents):
+            metadata = {
+                "doc_index": idx,
+                "doc_id": getattr(doc, "doc_id", None),
+                "metadata": doc.metadata if hasattr(doc, "metadata") else {},
+                "text_length": len(doc.text) if hasattr(doc, "text") else 0,
+            }
+            doc_metadata.append(metadata)
+        
+        self.log_event(
+            "document_metadata",
+            f"Loaded {len(documents)} documents from {Path(file_path).name}",
+            {"file_path": str(file_path), "documents": doc_metadata}
+        )
+        
+        # 詳細なメタデータをJSONファイルとして保存
+        if self.current_test_dir:
+            metadata_file = self.current_test_dir / "logs" / f"documents_{Path(file_path).stem}.json"
+            self._save_json(doc_metadata, metadata_file)
+    
+    def log_node_metadata(self, file_path: str, nodes: List[Any]):
+        """ノードのメタデータをログに記録"""
+        node_metadata = []
+        for idx, node in enumerate(nodes):
+            metadata = {
+                "node_index": idx,
+                "node_id": getattr(node, "node_id", None),
+                "node_type": type(node).__name__,
+                "metadata": node.metadata if hasattr(node, "metadata") else {},
+                "text_length": len(node.text) if hasattr(node, "text") else 0,
+                "relationships": {k: str(v) for k, v in node.relationships.items()} if hasattr(node, "relationships") else {},
+                "excluded_embed_metadata_keys": getattr(node, "excluded_embed_metadata_keys", []),
+                "excluded_llm_metadata_keys": getattr(node, "excluded_llm_metadata_keys", []),
+            }
+            node_metadata.append(metadata)
+        
+        self.log_event(
+            "node_metadata",
+            f"Created {len(nodes)} nodes from {Path(file_path).name}",
+            {"file_path": str(file_path), "nodes": node_metadata}
+        )
+        
+        # 詳細なメタデータをJSONファイルとして保存
+        if self.current_test_dir:
+            metadata_file = self.current_test_dir / "logs" / f"nodes_{Path(file_path).stem}.json"
+            self._save_json(node_metadata, metadata_file)
     
     def update_metrics(self, **kwargs):
         """メトリクスを更新"""
@@ -100,14 +149,14 @@ class TestMonitor:
         
         # 最終メタデータを更新
         metadata = {
-            "experiment_id": self.current_experiment_id,
+            "experiment_id": self.current_test_id,
             "start_time": self.start_time.isoformat(),
             "end_time": end_time.isoformat(),
             "duration_seconds": duration,
             "status": "completed" if success else "failed",
             "success": success
         }
-        self._save_json(metadata, self.current_experiment_dir / "metadata.json")
+        self._save_json(metadata, self.current_test_dir / "metadata.json")
         
         # ログを保存
         self._save_logs()
@@ -121,44 +170,44 @@ class TestMonitor:
         # サマリーを作成
         self._create_summary(success, duration)
         
-        logger.info(f"Ended experiment: {self.current_experiment_id} (Duration: {duration:.2f}s)")
+        logger.info(f"Ended experiment: {self.current_test_id} (Duration: {duration:.2f}s)")
     
     def _save_config(self, config: Dict[str, Any]):
         """設定を保存"""
-        config_path = self.current_experiment_dir / "config" / "experiment_config.json"
+        config_path = self.current_test_dir / "config" / "experiment_config.json"
         self._save_json(config, config_path)
     
     def _save_logs(self):
         """ログを保存"""
-        logs_path = self.current_experiment_dir / "logs" / "events.json"
+        logs_path = self.current_test_dir / "logs" / "events.json"
         self._save_json(self.logs, logs_path)
         
         # CSV形式でも保存（分析用）
         if self.logs:
             df = pd.DataFrame(self.logs)
-            csv_path = self.current_experiment_dir / "logs" / "events.csv"
+            csv_path = self.current_test_dir / "logs" / "events.csv"
             df.to_csv(csv_path, index=False, encoding="utf-8-sig")
     
     def _save_metrics(self):
         """メトリクスを保存"""
         metrics_dict = self.metrics.model_dump()
-        metrics_path = self.current_experiment_dir / "metrics" / "metrics.json"
+        metrics_path = self.current_test_dir / "metrics" / "metrics.json"
         self._save_json(metrics_dict, metrics_path)
         
         # CSV形式でも保存
         df = pd.DataFrame([metrics_dict])
-        csv_path = self.current_experiment_dir / "metrics" / "metrics.csv"
+        csv_path = self.current_test_dir / "metrics" / "metrics.csv"
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
     
     def _save_results(self, result_data: Dict[str, Any]):
         """結果を保存"""
-        results_path = self.current_experiment_dir / "results" / "results.json"
+        results_path = self.current_test_dir / "results" / "results.json"
         self._save_json(result_data, results_path)
     
     def _create_summary(self, success: bool, duration: float):
         """サマリーを作成"""
         summary = {
-            "experiment_id": self.current_experiment_id,
+            "experiment_id": self.current_test_id,
             "success": success,
             "duration_seconds": duration,
             "metrics": self.metrics.model_dump(),
@@ -166,7 +215,7 @@ class TestMonitor:
             "final_status": "completed" if success else "failed"
         }
         
-        summary_path = self.current_experiment_dir / "summary.json"
+        summary_path = self.current_test_dir / "summary.json"
         self._save_json(summary, summary_path)
         
         # 人間が読みやすいテキスト形式でも保存
@@ -174,7 +223,7 @@ class TestMonitor:
     
     def _save_summary_text(self, summary: Dict[str, Any]):
         """サマリーをテキスト形式で保存"""
-        summary_text_path = self.current_experiment_dir / "summary.txt"
+        summary_text_path = self.current_test_dir / "summary.txt"
         
         with open(summary_text_path, "w", encoding="utf-8") as f:
             f.write("=" * 80 + "\n")
@@ -197,5 +246,5 @@ class TestMonitor:
     
     def get_test_dir(self) -> Path:
         """現在の実験ディレクトリを取得"""
-        return self.current_experiment_dir
+        return self.current_test_dir
 
