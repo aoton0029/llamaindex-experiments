@@ -4,26 +4,8 @@ from pymilvus import CollectionSchema, FieldSchema, DataType
 from .base import SchemaBaseModel
 
 class TechColumnTerm(SchemaBaseModel):
-    """
-    Tech column model
-
-    "title": "Understanding Neural Networks",
-    "author": "John Doe",
-    "content": "ニューラルネットワークは...",
-    "tags": ["AI", "Machine Learning"],
-    "published_date": "2025-10-15",
-    "metadata": {
-      "source": "Tech Blog",
-      "last_updated": "2025-11-01"
-    }
-    """
-    # title: str = Field(..., description="コラムのタイトル")
-    # author: str = Field(..., description="著者名")
-    # content: str = Field(..., description="コラムの内容")
-    # tags: List[str] = Field(..., description="関連タグ")
-    # published_date: str = Field(..., description="公開日")
-    # metadata: Dict[str, Any] = Field(..., description="メタデータ")
-
+    """技術コラム"""
+    
     @staticmethod
     def get_milvus_schema(dim:int) -> CollectionSchema:
         """Milvus用のコレクションスキーマを取得"""
@@ -32,13 +14,20 @@ class TechColumnTerm(SchemaBaseModel):
             FieldSchema(name="_id", dtype=DataType.INT64, is_primary=True, auto_id=True),
             FieldSchema(name="id", dtype=DataType.VARCHAR, max_length=255),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
+            
             # オプションフィールド
-            FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=256, description="コラムのタイトル"),
-            FieldSchema(name="author", dtype=DataType.VARCHAR, max_length=128, description="著者名"),
-            FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=4096, description="コラムの内容"),
-            FieldSchema(name="tags", dtype=DataType.VARCHAR, max_length=512, description="関連タグ"),
-            FieldSchema(name="published_date", dtype=DataType.VARCHAR, max_length=32, description="公開日"),
-            FieldSchema(name="metadata", dtype=DataType.VARCHAR, max_length=2048, description="メタデータ"),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535, description="Document text content"),
+            FieldSchema(name="document_id", dtype=DataType.VARCHAR, max_length=256, description="Unique identifier for the document"),
+            FieldSchema(name="doc_id", dtype=DataType.VARCHAR, max_length=256, description="Document identifier"),
+            FieldSchema(name="_node_type", dtype=DataType.VARCHAR, max_length=128, description="Type of the node"),
+            FieldSchema(name="_node_content", dtype=DataType.VARCHAR, max_length=65535, description="Content of the node"),
+            FieldSchema(name="ref_doc_id", dtype=DataType.VARCHAR, max_length=256, description="Reference document identifier"),
+            # エクストラクタ
+            # FieldSchema(name="document_title", dtype=DataType.VARCHAR, max_length=512, description="タイトル"),
+            # FieldSchema(name="section_summary", dtype=DataType.VARCHAR, max_length=1024, description="要約"),
+            # FieldSchema(name="excerpt_keywords", dtype=DataType.VARCHAR, max_length=1024, description="キーワード"),
+            # メタデータ
+            FieldSchema(name="term_name", dtype=DataType.VARCHAR, max_length=256, description="用語"),
         ]
         schema = CollectionSchema(fields=fields, description="Tech Column Collection")
         return schema
