@@ -8,9 +8,10 @@ from llama_index.core.prompts import PromptTemplate
 from factories import (
     LLMFactory,
     ExtractorFactory,
-    DocumentLoader
+    DocumentLoader,
+    
 )
-from services.config_manager import ConfigManager
+from config_manager import ConfigManager
 from factories.template_prompts import TemplatePromptSettings
 from llama_index.core import Settings
 
@@ -35,7 +36,7 @@ def test_template(llm: BaseLLM, template: PromptTemplate, template_name: str, **
     try:
         # テンプレートをフォーマット
         prompt = template.format(**kwargs)
-        print(f"【送信プロンプト】{len(prompt)}文字\n{prompt[:300]}")
+        print(f"【送信プロンプト】{len(prompt)}文字\n{prompt}")
         print("-"*80)
         
         response = llm.complete(prompt)
@@ -54,7 +55,7 @@ def test_template(llm: BaseLLM, template: PromptTemplate, template_name: str, **
 def test_title(llm, context_str: str):
     return test_template(
         llm,
-        TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
+        TemplatePromptSettings.JP_TITLE_NODE_TMPL,
         "Title",
         context_str=context_str
     )
@@ -62,7 +63,7 @@ def test_title(llm, context_str: str):
 def test_summary(llm, context_str: str):
     return test_template(
         llm,
-        TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE,
+        TemplatePromptSettings.JP_SUMMARY_EXTRACT_TMPL,
         "Summary",
         context_str=context_str
     )
@@ -82,8 +83,9 @@ def main():
     TemplatePromptSettings.initialize(config_manager.get_template_prompts())
     # LLM設定（環境に応じて変更してください）
     backend = "vllm" 
-    model_name = "/models/Llama-3-ELYZA-JP-8B-AWQ"
-    base_url = "http://vllm:8000/v1"
+    # model_name = "/models/Llama-3-ELYZA-JP-8B"
+    model_name = "/models/Qwen/Qwen3-32B-AWQ"
+    base_url = "http://vllm-llm:8000/v1"
     
     print("LLMの初期化中...")
     try:
@@ -93,7 +95,11 @@ def main():
             base_url=base_url,
             temperature=0.0,
             timeout=180.0,
-            max_tokens=2048,
+            max_tokens=256,
+            additional_kwargs={
+                "frequency_penalty": 1.0,
+                "stop": ["\n"]
+            },
         )
         Settings.llm = llm
         print("✓ LLM初期化完了")
@@ -111,6 +117,7 @@ def main():
         test_results.append(test_title(llm, context_str))
         # test_results.append(test_summary(llm, context_str))
         # test_results.append(test_keywords(llm, context_str))
+        
 
     # 結果サマリー
     print(f"\n{'='*80}")

@@ -31,6 +31,8 @@ class TestMonitor:
         self.metrics = TestMetrics()
         self.start_time: Optional[datetime] = None
         self.logs: List[Dict[str, Any]] = []
+        self.logger: Optional[logging.Logger] = None
+        self.file_handler: Optional[logging.FileHandler] = None
     
     def start_test(self, test_name: str, config: Dict[str, Any]) -> str:
         """
@@ -51,11 +53,14 @@ class TestMonitor:
         # ディレクトリ構造を作成
         (self.current_test_dir / "config").mkdir(parents=True, exist_ok=True)
         (self.current_test_dir / "logs").mkdir(parents=True, exist_ok=True)
+        (self.current_test_dir / "metadatas").mkdir(parents=True, exist_ok=True)
         (self.current_test_dir / "metrics").mkdir(parents=True, exist_ok=True)
         (self.current_test_dir / "results").mkdir(parents=True, exist_ok=True)
         
+        self._setup_logger()
+        
         # 設定を保存
-        self._save_config(config)
+        self._save_config("test_config", config)
         
         # メタデータを保存
         metadata = {
@@ -69,15 +74,16 @@ class TestMonitor:
         logger.info(f"Started experiment: {self.current_test_id}")
         return self.current_test_id
     
+    
     def log_event(self, event_type: str, message: str, data: Optional[Dict[str, Any]] = None):
         """イベントをログに記録"""
-        event = {
-            "timestamp": datetime.now().isoformat(),
-            "event_type": event_type,
-            "message": message,
-            "data": data or {}
-        }
-        self.logs.append(event)
+        # event = {
+        #     "timestamp": datetime.now().isoformat(),
+        #     "event_type": event_type,
+        #     "message": message,
+        #     "data": data or {}
+        # }
+        # self.logs.append(event)
         logger.info(f"[{event_type}] {message}")
     
     def log_document_metadata(self, file_path: str, documents: List[Any]):
@@ -88,6 +94,7 @@ class TestMonitor:
                 "doc_index": idx,
                 "doc_id": getattr(doc, "doc_id", None),
                 "metadata": doc.metadata if hasattr(doc, "metadata") else {},
+                "text": doc.text,
                 "text_length": len(doc.text) if hasattr(doc, "text") else 0,
             }
             doc_metadata.append(metadata)
@@ -100,7 +107,7 @@ class TestMonitor:
         
         # 詳細なメタデータをJSONファイルとして保存
         if self.current_test_dir:
-            metadata_file = self.current_test_dir / "logs" / f"documents_{Path(file_path).stem}.json"
+            metadata_file = self.current_test_dir / "metadatas" / f"documents_{Path(file_path).stem}.json"
             self._save_json(doc_metadata, metadata_file)
     
     def log_node_metadata(self, file_path: str, nodes: List[Any]):
@@ -112,6 +119,7 @@ class TestMonitor:
                 "node_id": getattr(node, "node_id", None),
                 "node_type": type(node).__name__,
                 "metadata": node.metadata if hasattr(node, "metadata") else {},
+                "text": node.text,
                 "text_length": len(node.text) if hasattr(node, "text") else 0,
                 "relationships": {k: str(v) for k, v in node.relationships.items()} if hasattr(node, "relationships") else {},
                 "excluded_embed_metadata_keys": getattr(node, "excluded_embed_metadata_keys", []),
@@ -127,7 +135,7 @@ class TestMonitor:
         
         # 詳細なメタデータをJSONファイルとして保存
         if self.current_test_dir:
-            metadata_file = self.current_test_dir / "logs" / f"nodes_{Path(file_path).stem}.json"
+            metadata_file = self.current_test_dir / "metadatas" / f"nodes_{Path(file_path).stem}.json"
             self._save_json(node_metadata, metadata_file)
     
     def update_metrics(self, **kwargs):
@@ -172,9 +180,44 @@ class TestMonitor:
         
         logger.info(f"Ended experiment: {self.current_test_id} (Duration: {duration:.2f}s)")
     
-    def _save_config(self, config: Dict[str, Any]):
+    
+    def _setup_logger(self):
+        if self.file_handler:
+            if self.logger:
+                self.logger.removeHandler(self.file_handler)
+            self.file_handler.close()
+        
+        self.logger = logging.getLogger(f"test_monitor.{self.current_test_id}")
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
+        
+        self.logger.handlers.clear()
+        
+        log_file = self.current_test_dir / "logs" / "test_monitor.log"
+        self.file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        self.file_handler.setLevel(logging.DEBUG)
+        
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        self.file_handler.setFormatter(formatter)
+        self.logger.addHandler(self.file_handler)
+        
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+    
+    def _cleanup_logger(self):
+        if self.file_handler and self.logger:
+            self.logger.removeHandler(self.file_handler)
+            self.file_handler.close()
+            self.file_handler = None
+    
+    def _save_config(self, name: str, config: Dict[str, Any]):
         """設定を保存"""
-        config_path = self.current_test_dir / "config" / "experiment_config.json"
+        config_path = self.current_test_dir / "config" / f"{name}.json"
         self._save_json(config, config_path)
     
     def _save_logs(self):
@@ -247,4 +290,6 @@ class TestMonitor:
     def get_test_dir(self) -> Path:
         """現在の実験ディレクトリを取得"""
         return self.current_test_dir
+        
+
 

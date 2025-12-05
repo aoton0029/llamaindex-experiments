@@ -1,6 +1,8 @@
+import os
 import sys
 import logging
 import json
+import dotenv
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Tuple, List
 from pathlib import Path
@@ -40,11 +42,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-from llama_index.core.callbacks import LlamaDebugHandler, CallbackManager
-llamadebughandler = LlamaDebugHandler()
-callback_manager = CallbackManager([llamadebughandler])
-Settings.callback_manager = callback_manager
-
 
 class TestRunnerBase(ABC):
     """
@@ -69,8 +66,8 @@ class TestRunnerBase(ABC):
         self.monitor = TestMonitor(result_dir)
         self.db_manager: DatabaseManager = None
         self.storage_context_manager: StorageContextManager = None
-    
-    def _setup_llm(self, llm_config_model_name: str) -> BaseLLM:
+
+    def _setup_llm(self, llm_config_model_name: str, llm_domain_kwargs_model_name: str) -> BaseLLM:
         """
         LLMをセットアップ
         
@@ -83,6 +80,7 @@ class TestRunnerBase(ABC):
         try:
             self.monitor.log_event("setup", "Setting up LLM...")
             llm_config = self.config_manager.get_llm_config(llm_config_model_name)
+            llm_domain_kwargs = self.config_manager.get_llm_domain_kwargs(llm_domain_kwargs_model_name)
             
             backend = llm_config["backend"]
             base_url = llm_config["base_url"]
@@ -92,7 +90,7 @@ class TestRunnerBase(ABC):
                 backend=backend,
                 model_name=model_name,
                 base_url=base_url,
-                **llm_config.get("kwargs", {})
+                **llm_domain_kwargs
             )
 
             self.monitor.log_event("setup", f"Set up LLM: {model_name}")
@@ -327,7 +325,8 @@ class TestRunnerBase(ABC):
     def _setup_storage_context(
         self, 
         storage_config_dict: Dict[str, Any],
-        storage_context_manager: StorageContextManager = None
+        storage_context_manager: StorageContextManager = None,
+        drop_existing: bool = False
     ) -> StorageContext:
         """
         StorageContextをセットアップ
@@ -335,7 +334,7 @@ class TestRunnerBase(ABC):
         Args:
             storage_config_dict: StorageContext設定辞書
             storage_context_manager: StorageContextManagerインスタンス（Noneの場合は既存のものを使用）
-            
+            drop_existing: 既存のStorageContextを削除してから作成するか
         Returns:
             StorageContextインスタンス
         """
@@ -351,11 +350,20 @@ class TestRunnerBase(ABC):
             
             # 設定辞書からStorageContextConfigを作成
             storage_config = StorageContextConfig.from_dict(storage_config_dict)
+            context_name = storage_config.context_name
+            
+            # 既存のStorageContextを削除
+            if drop_existing:
+                self.monitor.log_event("setup", f"Dropping existing storage context... {context_name}")
+                try:
+                    storage_context_manager.drop_storage_context(storage_config)
+                    self.monitor.log_event("setup", f"Dropped existing storage context: {context_name}")
+                except Exception as e:
+                    self.monitor.log_event("setup", f"No existing storage context to drop or error: {e}")
             
             # StorageContextを作成
             storage_context = storage_context_manager.create_storage_context(storage_config)
             
-            context_name = storage_config.context_name
             self.monitor.log_event("setup", f"Set up storage context: {context_name}")
             return storage_context
         except Exception as e:
@@ -422,22 +430,36 @@ class TestRunnerBase(ABC):
             logger.error(f"Failed to get file paths from data source: {e}")
             raise
     
-    def _save_phase_result(self, experiment_dir: Path, phase_name: str, data: Dict[str, Any]):
-        """
-        各フェーズの結果を保存
+    def _setup_callback(self):
+        from llama_index.core import set_global_handler
+        from langfuse.llama_index import LlamaIndexCallbackHandler
+        from llama_index.core.callbacks import LlamaDebugHandler, CallbackManager
         
-        Args:
-            experiment_dir: 実験ディレクトリ
-            phase_name: フェーズ名
-            data: 保存するデータ
-        """
-        phase_dir = experiment_dir / "results" / "phases"
-        phase_dir.mkdir(parents=True, exist_ok=True)
-        
-        # JSON形式で保存
-        json_path = phase_dir / f"{phase_name}.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"Saved phase result: {phase_name}")
+        try:
+            dotenv.load_dotenv()
+            secret_key = os.getenv('LANGFUSE_SECRET_KEY')
+            public_key = os.getenv('LANGFUSE_PUBLIC_KEY')
+            host = os.getenv('LANGFUSE_BASE_URL')
+            logger.info(f"LANGFUSE_SECRET_KEY: {secret_key}")
+            logger.info(f"LANGFUSE_PUBLIC_KEY: {public_key}")
+            logger.info(f"LANGFUSE_BASE_URL: {host}")
+            # set_global_handler("langfuse", public_key=public_key, secret_key=secret_key, host=host)
+
+            langfuse_callback_handler = LlamaIndexCallbackHandler(public_key=public_key, secret_key=secret_key, host=host)
+            Settings.callback_manager = CallbackManager([langfuse_callback_handler])
+            
+            # from llama_index.core.callbacks import LlamaDebugHandler, CallbackManager
+            # llamadebughandler = LlamaDebugHandler()
+            # callback_manager = CallbackManager([llamadebughandler])
+            # Settings.callback_manager = callback_manager
+        except Exception as e:
+            self.monitor.log_event("warning", f"Failed to: {e}")
+            raise
     
+    def _flush_handler(self):
+        from llama_index.core import global_handler
+        if global_handler:
+            print("flushing langfuse traces...")
+            
+            
+            
