@@ -44,7 +44,7 @@ class StructuredTitleExtractor(BaseExtractor):
         super().__init__(**kwargs)
         self._program = LLMTextCompletionProgram.from_defaults(
             output_cls=TitleOutput,
-            prompt_template_str=TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
+            prompt_template_str=TemplatePromptSettings.JP_TITLE_NODE_TMPL,
             verbose=True
         )
     
@@ -74,7 +74,7 @@ class StructuredSummaryExtractor(BaseExtractor):
         super().__init__(**kwargs)        
         self._program = LLMTextCompletionProgram.from_defaults(
             output_cls=SummaryOutput,
-            prompt_template_str=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE,
+            prompt_template_str=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TMPL,
             verbose=True
         )
     
@@ -101,11 +101,11 @@ class StructuredKeywordExtractor(BaseExtractor):
     
     _program: LLMTextCompletionProgram = PrivateAttr()
     
-    def __init__(self, max_keywords: int = 10, **kwargs):
+    def __init__(self, keywords: int = 10, **kwargs):
         super().__init__(**kwargs)
         self._program = LLMTextCompletionProgram.from_defaults(
             output_cls=KeywordOutput,
-            prompt_template_str=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL.format(max_keywords=max_keywords),
+            prompt_template_str=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL.format(keywords=keywords),
             verbose=True
         )
 
@@ -155,10 +155,10 @@ class ExtractorFactory:
         try:
             extractor = TitleExtractor(
                 nodes = nodes,
-                node_template = TemplatePromptSettings.JP_TITLE_NODE_TEMPLATE,
-                combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TEMPLATE
+                node_template = TemplatePromptSettings.JP_TITLE_NODE_TMPL,
+                combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TMPL
             )
-            logger.info("TitleExtractorを作成")
+            logger.info(f"TitleExtractorを作成 nodes:{nodes}")
             return extractor
         except Exception as e:
             logger.error(f"TitleExtractor作成エラー: {e}")
@@ -172,7 +172,7 @@ class ExtractorFactory:
         """
         try:
             extractor = SummaryExtractor(
-                prompt_template=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TEMPLATE
+                prompt_template=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TMPL
             )
             logger.info("SummaryExtractorを作成")
             return extractor
@@ -191,7 +191,7 @@ class ExtractorFactory:
                 prompt_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
                 keywords=keywords
             )
-            logger.info("KeywordExtractorを作成")
+            logger.info(f"KeywordExtractorを作成 keywords:{keywords}")
             return extractor
         except Exception as e:
             logger.error(f"KeywordExtractor作成エラー: {e}")

@@ -67,3 +67,4 @@ class RetrieverFactory:
         else:
             raise ValueError(f"未知のリトリバータイプ: {retriever_type}")
     
+

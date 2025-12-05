@@ -18,7 +18,8 @@ from llama_index.core.selectors import (
 )
 from llama_index.core.tools import QueryEngineTool, RetrieverTool
 from llama_index.core.indices.base import BaseIndex
-
+from llama_index.core.response_synthesizers import TreeSummarize
+from .template_prompts import TemplatePromptSettings
 from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
 from .template_prompts import *
 
@@ -65,22 +66,26 @@ class QueryEngineFactory:
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=query_engine_tools,
-            response_synthesizer=response_synthesizer
+            summarizer=TreeSummarize(
+                summary_template=TemplatePromptSettings.JP_TREE_SUMMARIZE_PROMPT_SEL,
+                verbose=True
+            )
         )
     
-    @staticmethod
-    def create_router_query_engine(
-        selector_type: str,
-        indices: List[Tuple[BaseIndex, str, str]],
-        response_mode: ResponseMode = ResponseMode.COMPACT,
-    ) -> RouterQueryEngine:
-        selector = SelectorFactory.create(selector_type=selector_type)
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
-        return RouterQueryEngine(
-            selector=selector,
-            query_engine_tools=[ToolFactory.create_query_engine_tool(idx.as_query_engine(), name, desc) for idx, name, desc in indices],
-            response_synthesizer=response_synthesizer
-        )
+    # @staticmethod
+    # def create_router_query_engine(
+    #     selector_type: str,
+    #     indices: List[Tuple[BaseIndex, str, str]],
+    #     response_mode: ResponseMode = ResponseMode.COMPACT,
+    # ) -> RouterQueryEngine:
+    #     selector = SelectorFactory.create(selector_type=selector_type)
+    #     response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+    #     return RouterQueryEngine(
+    #         selector=selector,
+    #         query_engine_tools=[ToolFactory.create_query_engine_tool(idx.as_query_engine(), name, desc) for idx, name, desc in indices],
+    #         response_synthesizer=response_synthesizer
+    #     )
+        
 
     @staticmethod
     def create_retry_query_engine(
@@ -164,7 +169,7 @@ class SelectorFactory:
     def create_llm_single_selector():
         try:
             selector = LLMSingleSelector.from_defaults(
-                prompt_template_str=DEFAULT_SINGLE_SELECT_PROMPT_TMPL
+                prompt_template_str=TemplatePromptSettings.JP_SINGLE_SELECT_PROMPT_TMPL
             )
             logger.info("LLMSingleSelectorを作成")
             return selector
@@ -176,7 +181,7 @@ class SelectorFactory:
     def create_llm_multi_selector():
         try:
             selector = LLMMultiSelector.from_defaults(
-                prompt_template_str=DEFAULT_MULTI_SELECT_PROMPT_TMPL
+                prompt_template_str=TemplatePromptSettings.JP_MULTI_SELECT_PROMPT_TMPL
             )
             logger.info("LLMMultiSelectorを作成")
             return selector
