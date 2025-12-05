@@ -1,9 +1,11 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from llama_index.core.indices.base import BaseIndex
 from llama_index.core.storage.storage_context import StorageContext
 from .database_manager import DatabaseManager
 from pymilvus import CollectionSchema
+from llama_index.core import load_index_from_storage, load_indices_from_storage
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -198,6 +200,13 @@ class StorageContextManager:
                 dim=config.vector_store.dim,
                 schema=config.vector_store.schema, 
             )
+            try:
+                milvus_client = self.db_manager.get_milvus_client()
+                milvus_client.load_collection(config.vector_store.collection_name)
+                logger.info(f"Successfully loaded Milvus Collection: {config.vector_store.collection_name}")
+            except Exception as e:
+                logger.info(f"collection loaded Error: {config.vector_store.collection_name}")
+                
         if config.image_store:
             kwargs["image_store"] = self.db_manager.get_image_store(
                 collection_name=config.image_store.collection_name,
@@ -220,6 +229,36 @@ class StorageContextManager:
     def get_storage_context(self, context_name: str) -> Optional[StorageContext]:
         """作成済みのStorageContextを取得"""
         return self._storage_contexts.get(context_name)
+    
+    def load_index(self, context_name: str, index_id: Optional[str]) -> BaseIndex | List[BaseIndex]:
+        """
+        StorageContextからインデックスをロード
+        
+        Args:
+            context_name: StorageContextの識別名
+            index_id: インデックスID (Noneの場合は全インデックスをロード)
+            
+        Returns:
+            インデックスまたはインデックスのリスト
+        """
+        storage_context = self.get_storage_context(context_name)
+        if not storage_context:
+            raise ValueError(f"StorageContext '{context_name}' が見つかりません")
+        
+        index = load_index_from_storage(storage_context, index_id=index_id)
+        logger.info(f"インデックス '{index_id}' をロードしました")
+        return index
+
+        
+    def load_indices(self, context_name:str) -> List[BaseIndex]:
+        storage_context = self.get_storage_context(context_name)
+        if not storage_context:
+            raise ValueError(f"StorageContext '{context_name}' が見つかりません")
+
+        indices = load_indices_from_storage(storage_context)
+        logger.info(f"{len(indices)} 個のインデックスをロードしました")
+        return indices
+        
     
     def drop_storage_context_by_name(self, context_name: str) -> None:
         """

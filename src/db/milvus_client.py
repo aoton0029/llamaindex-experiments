@@ -231,6 +231,14 @@ class MilvusClient:
                 self.drop_collection(name)
             logger.info("全コレクションをリセットしました")
     
+    
+    def get_field_values(self, collection_name, expr, fields:List[str], limit:int):
+        collection = self.get_collection(collection_name)        
+        results = collection.query(expr=expr, output_fields=fields, limit=limit)
+        logger.info(f"{collection_name}から{len(results)}件取得")
+        return results
+                
+    
     def __enter__(self):
         self.connect()
         return self

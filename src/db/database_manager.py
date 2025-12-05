@@ -247,11 +247,11 @@ class DatabaseManager:
             logger.error(f"Milvus ヘルスチェックエラー: {e}")
             health_status["milvus"] = False
         
-        try:
-            health_status["neo4j"] = self.get_neo4j_client().health_check()
-        except Exception as e:
-            logger.error(f"Neo4j ヘルスチェックエラー: {e}")
-            health_status["neo4j"] = False
+        # try:
+        #     health_status["neo4j"] = self.get_neo4j_client().health_check()
+        # except Exception as e:
+        #     logger.error(f"Neo4j ヘルスチェックエラー: {e}")
+        #     health_status["neo4j"] = False
         
         return health_status
 

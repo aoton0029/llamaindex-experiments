@@ -2,11 +2,11 @@
 Redisクライアントクラス
 インデックスストアとして使用
 """
-
+import json
 import logging
 from typing import Optional, Dict, Any, List
 import redis
-from redis.connection import ConnectionPool
+from redis.connection import ConnectionPool, Connection
 from llama_index.storage.index_store.redis import RedisIndexStore
 from llama_index.core.storage.index_store.types import BaseIndexStore
 
@@ -22,11 +22,11 @@ class RedisClient:
     
     def __init__(
         self,
-        host: str = "localhost",
+        host: str = "redis",
         port: int = 6379,
         password: Optional[str] = None,
         db: int = 0,
-        decode_responses: bool = True,
+        decode_responses: bool = False,
         socket_timeout: float = 30.0,
         socket_connect_timeout: float = 30.0,
         max_connections: int = 50,
@@ -107,7 +107,7 @@ class RedisClient:
     def get_index_store(
         self,
         namespace: str = "default",
-        collection_suffix: str = "index_store"
+        collection_suffix: str = ""
     ) -> BaseIndexStore:
         """
         llama_index RedisIndexStoreを取得
@@ -137,8 +137,88 @@ class RedisClient:
     def get_key(self, key: str) -> Any:
         """キーの値を取得"""
         client = self.get_client()
-        return client.get(key)
+        raw_type = client.type(key)
+        
+        if isinstance(raw_type, bytes):
+            t = raw_type.decode()
+        else:
+            t = raw_type
+        
+        if not t or t == 'none':
+            return None
+        
+        try:
+            if t == 'string':
+                return client.get(key)
+            elif t == 'hash':
+                return client.hgetall(key)
+            elif t == 'list':
+                return client.lrange(key, 0, -1)
+            elif t in ('zset', 'sortedset'):
+                return client.zrange(key, 0, -1, withscores=True)
+            elif t == 'stream':
+                return client.xrange(key)
+            else:
+                logger.warning(f"Unsupported Redis type for get_key: key={key} type={t}")
+                return client.get(key)
+        except Exception as e:
+            logger.error(e)
+            raise
     
+    def get_field(self, key: str, field: str):
+        client = self.get_client()
+        raw_type = client.type(key)
+        
+        if isinstance(raw_type, bytes):
+            t = raw_type.decode()
+        else:
+            t = raw_type
+        
+        if not t or t == 'none':
+            return None
+
+        try:
+            if t == 'hash':
+                byte_value = client.hget(key, field)
+                return self._parse_nested_json_bytes(byte_value)
+            logger.warning(f"get_field called for non-hash key: key={key} type={t}")
+            return None
+        except redis.ResponseError as e:
+            logger.error(e)
+            raise
+    
+    def _parse_nested_json_bytes(self, data: Any) ->Optional[Dict[str, Any]]:
+        try:
+            if isinstance(data, bytes):
+                data = data.decode('utf-8')
+            
+            if isinstance(data, str):
+                data = json.loads(data)
+            
+            if not isinstance(data, dict):
+                return data
+            
+            result = {}
+            for key, value in data.items():
+                if isinstance(value, bytes):
+                    value = value.decode('utf-8')
+                if isinstance(value, str) and (value.startswith('{') or value.startswith('[')):
+                    try:
+                        parsed_json = json.loads(value)
+                        result[key] = self._parse_nested_json_bytes(parsed_json)
+                    except json.JSONDecodeError:
+                        result[key] = value
+                elif isinstance(value, dict):
+                    result[key] = self._parse_nested_json_bytes(value)
+                elif isinstance(value, list):
+                    result[key] = [self._parse_nested_json_bytes(item) for item in value]
+                else:
+                    result[key] = value
+            return result
+        except Exception as e:
+            logger.error(f"ネストしたjsonのパースエラー: {e}")
+            return data if not isinstance(data, bytes) else data.decode('utf-8')
+            
     def delete_key(self, key: str) -> int:
         """キーを削除"""
         client = self.get_client()
