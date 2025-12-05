@@ -59,7 +59,9 @@ class _TemplatePromptSettings:
     JP_REFINE_TABLE_CONTEXT_PROMPT_SEL: SelectorPromptTemplate = None
     # Selection
     JP_SINGLE_SELECT_PROMPT_TMPL: str = None
+    JP_SINGLE_SELECT_PROMPT_JSON_TMPL: str = None
     JP_MULTI_SELECT_PROMPT_TMPL: str = None
+    JP_MULTI_SELECT_PROMPT_JSON_TMPL: str = None
     # Extractor
     JP_TITLE_NODE_TMPL: str = None
     JP_TITLE_COMBINE_TMPL: str = None
@@ -144,8 +146,12 @@ class _TemplatePromptSettings:
                 selection = templates["selection"]
                 if "jp_single_select_tmpl" in selection:
                     cls.JP_SINGLE_SELECT_PROMPT_TMPL = selection["jp_single_select_tmpl"]
+                if "jp_single_select_json_tmpl" in selection:
+                    cls.JP_SINGLE_SELECT_PROMPT_JSON_TMPL = selection["jp_single_select_json_tmpl"]
                 if "jp_multi_select_tmpl" in selection:
                     cls.JP_MULTI_SELECT_PROMPT_TMPL = selection["jp_multi_select_tmpl"]
+                if "jp_multi_select_json_tmpl" in selection:
+                    cls.JP_MULTI_SELECT_PROMPT_JSON_TMPL = selection["jp_multi_select_json_tmpl"]
             
             if "extractor" in templates:
                 extractor = templates["extractor"]

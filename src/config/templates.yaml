@@ -177,7 +177,7 @@ template_prompts:
       選択肢：{context_list}
       回答：
 
-    jp_single_select_to_json_tmpl: |
+    jp_single_select_json_tmpl: |
       あなたは高度な情報検索システムのクエリルーターです。
       質問を分析し、最も適切な情報源を1つだけ選択し、JSON形式で回答する専門家です。
 
@@ -254,7 +254,7 @@ template_prompts:
       選択肢：{context_list}
       回答：
 
-    jp_multi_select_to_json_tmpl: |
+    jp_multi_select_json_tmpl: |
       あなたは情報検索システムのマルチクエリルーターです。
       質問を分析し、適切な情報源を複数選択し、JSON形式で回答する専門家です。
 

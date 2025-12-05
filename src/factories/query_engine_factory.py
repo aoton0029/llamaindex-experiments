@@ -20,8 +20,9 @@ from llama_index.core.tools import QueryEngineTool, RetrieverTool
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.response_synthesizers import TreeSummarize
 from .template_prompts import TemplatePromptSettings
+from .output_parser_factory import JapaneseSelectionOutputParser
 from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
-from .template_prompts import *
+
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +170,8 @@ class SelectorFactory:
     def create_llm_single_selector():
         try:
             selector = LLMSingleSelector.from_defaults(
-                prompt_template_str=TemplatePromptSettings.JP_SINGLE_SELECT_PROMPT_TMPL
+                prompt_template_str=TemplatePromptSettings.JP_SINGLE_SELECT_PROMPT_JSON_TMPL,
+                output_parser=JapaneseSelectionOutputParser(),
             )
             logger.info("LLMSingleSelectorを作成")
             return selector
@@ -181,7 +183,8 @@ class SelectorFactory:
     def create_llm_multi_selector():
         try:
             selector = LLMMultiSelector.from_defaults(
-                prompt_template_str=TemplatePromptSettings.JP_MULTI_SELECT_PROMPT_TMPL
+                prompt_template_str=TemplatePromptSettings.JP_MULTI_SELECT_PROMPT_JSON_TMPL,
+                output_parser=JapaneseSelectionOutputParser()
             )
             logger.info("LLMMultiSelectorを作成")
             return selector

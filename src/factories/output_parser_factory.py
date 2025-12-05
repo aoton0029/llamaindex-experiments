@@ -16,25 +16,6 @@ def _escape_curly_braces(input_string: str) -> str:
     return input_string.replace("{", "{{").replace("}", "}}")
 
 
-# 日本語フォーマット文字列
-JP_FORMAT_STR = """出力は以下のJSON形式のみで返してください。
-
-# 例
-[
-    {{
-        "choice": 1,
-        "reason": "<選択理由をここに記入>"
-    }},
-    ...
-]
-
-# 注意事項:
-- JSON形式で出力すること
-- choice: 選択した番号（整数）
-- reason: 選択した理由（日本語で説明）
-"""
-
-
 @dataclass
 class JapaneseAnswer(DataClassJsonMixin):
     """日本語対応の回答データクラス"""

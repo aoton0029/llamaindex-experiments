@@ -7,7 +7,7 @@ embedding_config_models:
     backend: "ollama"
     model_name: "qwen3-embedding:8b"
     base_url: "http://ollama:11434"
-    dimensions: 8192
+    dimensions: 4096
     kwargs:
       # batch_size: 32
       timeout: 3660

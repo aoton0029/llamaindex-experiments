@@ -3,9 +3,9 @@
 
 llm_config_models:
   # Ollama系 (ローカル推論)
-  ollama_qwen3_32b:
+  ollama_qwen3_8b:
     backend: "ollama"
-    model_name: "qwen3:32b"
+    model_name: "qwen3:8b"
     base_url: "http://ollama:11434"
  
   # vLLM (GPU推論サーバー)
