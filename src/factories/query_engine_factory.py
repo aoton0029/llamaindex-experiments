@@ -1,7 +1,5 @@
-
 import logging
 from typing import List, Optional, Dict, Any, Sequence, Tuple
-
 from llama_index.core.query_engine import (
     BaseQueryEngine,
     RetrieverQueryEngine,
@@ -12,16 +10,13 @@ from llama_index.core.query_engine import (
     RetrySourceQueryEngine
 )
 from llama_index.core.retrievers import BaseRetriever
-from llama_index.core.selectors import (
-    LLMSingleSelector,
-    LLMMultiSelector,
-)
-from llama_index.core.tools import QueryEngineTool, RetrieverTool
-from llama_index.core.indices.base import BaseIndex
-from llama_index.core.response_synthesizers import TreeSummarize
+from llama_index.core.tools import QueryEngineTool
 from .template_prompts import TemplatePromptSettings
-from .output_parser_factory import JapaneseSelectionOutputParser
+from llama_index.core.response_synthesizers import TreeSummarize
 from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
+from llama_index.core.evaluation import BaseEvaluator
+from llama_index.core.base.llms.base import BaseLLM
+from llama_index.core.postprocessor.node import BaseNodePostprocessor
 
 
 logger = logging.getLogger(__name__)
@@ -44,58 +39,62 @@ class QueryEngineFactory:
             raise ValueError(f"未知のクエリエンジンタイプ: {query_engine_type}")
     
     @staticmethod
+    def create_query_engine_tool(query_engine: BaseQueryEngine, name: str, description: str) -> QueryEngineTool:
+        try:
+            tool = QueryEngineTool.from_defaults(
+                query_engine=query_engine,
+                name=name,
+                description=description,
+            )
+            logger.info(f"QueryEngineToolを作成: {name}")
+            return tool
+        except Exception as e:
+            logger.error(f"QueryEngineTool作成エラー: {e}")
+            raise
+    
+    @staticmethod
     def create_retriever_query_engine(
-        index: BaseIndex,
         retriever: BaseRetriever,
         response_mode: ResponseMode = ResponseMode.COMPACT,
+        node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
     ) -> RetrieverQueryEngine:
         response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RetrieverQueryEngine(
-            index=index,
             retriever=retriever,
-            response_synthesizer=response_synthesizer
+            response_synthesizer=response_synthesizer,
+            node_postprocessors=node_postprocessors
         )
     
     @staticmethod
     def create_router_query_engine(
         selector_type: str,
         query_engine_tools: Sequence[QueryEngineTool],
-        response_mode: ResponseMode = ResponseMode.COMPACT,
+        query_engine_llm: BaseLLM,
+        tree_summarize_llm: BaseLLM,
     ) -> RouterQueryEngine:
-        selector = SelectorFactory.create(selector_type=selector_type)
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+        selector = SelectorFactory.create(selector_type=selector_type, llm=query_engine_llm)
+        tree_summarizer = TreeSummarize(
+            llm=tree_summarize_llm,
+            summary_template=TemplatePromptSettings.JP_TREE_SUMMARIZE_PROMPT_SEL,
+            verbose=True
+        )
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=query_engine_tools,
-            summarizer=TreeSummarize(
-                summary_template=TemplatePromptSettings.JP_TREE_SUMMARIZE_PROMPT_SEL,
-                verbose=True
-            )
+            llm = query_engine_llm,
+            summarizer=tree_summarizer
         )
-    
-    # @staticmethod
-    # def create_router_query_engine(
-    #     selector_type: str,
-    #     indices: List[Tuple[BaseIndex, str, str]],
-    #     response_mode: ResponseMode = ResponseMode.COMPACT,
-    # ) -> RouterQueryEngine:
-    #     selector = SelectorFactory.create(selector_type=selector_type)
-    #     response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
-    #     return RouterQueryEngine(
-    #         selector=selector,
-    #         query_engine_tools=[ToolFactory.create_query_engine_tool(idx.as_query_engine(), name, desc) for idx, name, desc in indices],
-    #         response_synthesizer=response_synthesizer
-    #     )
-        
 
     @staticmethod
     def create_retry_query_engine(
         query_engine: BaseQueryEngine,
+        evaluator: BaseEvaluator,
         response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RetryQueryEngine:
         response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
         return RetryQueryEngine(
             query_engine=query_engine,
+            evaluator=evaluator,
             response_synthesizer=response_synthesizer
         )
     
@@ -123,74 +122,6 @@ class QueryEngineFactory:
         )
 
 
-class ToolFactory:
-    @staticmethod
-    def create_query_engine_tool(query_engine: BaseQueryEngine, name: str, description: str,) -> QueryEngineTool:
-        try:
-            tool = QueryEngineTool.from_defaults(
-                query_engine=query_engine,
-                name=name,
-                description=description,
-            )
-            logger.info(f"QueryEngineToolを作成: {name}")
-            return tool
-        except Exception as e:
-            logger.error(f"QueryEngineTool作成エラー: {e}")
-            raise
-    
-    @staticmethod
-    def create_retriever_tool(retriever: BaseRetriever, name: str, description: str,) -> RetrieverTool:
-        try:
-            from llama_index.core.tools import RetrieverTool
-            
-            tool = RetrieverTool.from_defaults(
-                retriever=retriever,
-                name=name,
-                description=description,
-            )
-            logger.info(f"RetrieverToolを作成: {name}")
-            return tool
-        except Exception as e:
-            logger.error(f"RetrieverTool作成エラー: {e}")
-            raise
-
-
-class SelectorFactory:
-
-    @staticmethod
-    def create(selector_type:str):
-        if selector_type == "llm_single":
-            return SelectorFactory.create_llm_single_selector() 
-        elif selector_type == "llm_multi":
-            return SelectorFactory.create_llm_multi_selector()
-        else:
-            raise ValueError(f"未知のセレクタータイプ: {selector_type}")
-    
-    @staticmethod
-    def create_llm_single_selector():
-        try:
-            selector = LLMSingleSelector.from_defaults(
-                prompt_template_str=TemplatePromptSettings.JP_SINGLE_SELECT_PROMPT_JSON_TMPL,
-                output_parser=JapaneseSelectionOutputParser(),
-            )
-            logger.info("LLMSingleSelectorを作成")
-            return selector
-        except Exception as e:
-            logger.error(f"LLMSingleSelector作成エラー: {e}")
-            raise
-    
-    @staticmethod
-    def create_llm_multi_selector():
-        try:
-            selector = LLMMultiSelector.from_defaults(
-                prompt_template_str=TemplatePromptSettings.JP_MULTI_SELECT_PROMPT_JSON_TMPL,
-                output_parser=JapaneseSelectionOutputParser()
-            )
-            logger.info("LLMMultiSelectorを作成")
-            return selector
-        except Exception as e:
-            logger.error(f"LLMMultiSelector作成エラー: {e}")
-            raise
 
 
 class MetadataFilterFactory:

@@ -1,12 +1,6 @@
-"""
-Retriever Module
-各種Retrieverの実装
-"""
-
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Sequence
 from abc import ABC, abstractmethod
-
 from llama_index.core.schema import NodeWithScore, QueryBundle
 from llama_index.core.retrievers import (
     BaseRetriever,
@@ -27,6 +21,12 @@ from llama_index.core.retrievers import (
     KnowledgeGraphRAGRetriever
 )
 from llama_index.core.indices.base import BaseIndex
+from llama_index.core.retrievers import BaseRetriever
+from llama_index.core.tools import RetrieverTool
+from llama_index.core.indices.base import BaseIndex
+from llama_index.core.postprocessor.node import BaseNodePostprocessor
+from llama_index.core.selectors import BaseSelector
+from llama_index.core.base.llms.base import BaseLLM
 
 logger = logging.getLogger(__name__)
 
@@ -37,34 +37,34 @@ class GoldenRetriever(BaseRetriever):
 
 class RetrieverFactory:
     @staticmethod
-    def create(retriever_type: str, index: BaseIndex, **kwargs) -> BaseRetriever:
-        if retriever_type == "vector":
-            return VectorIndexRetriever(index=index, **kwargs)
-        elif retriever_type == "keyword_table":
-            return KeywordTableSimpleRetriever(index=index, **kwargs)
-        elif retriever_type == "summary":
-            return SummaryIndexRetriever(index=index, **kwargs)
-        elif retriever_type == "router":
-            return RouterRetriever(index=index, **kwargs)
-        elif retriever_type == "tree_root":
-            return TreeRootRetriever(index=index, **kwargs)
-        elif retriever_type == "transform":
-            return TransformRetriever(index=index, **kwargs)
-        elif retriever_type == "query_fusion":
-            return QueryFusionRetriever(index=index, **kwargs)
-        elif retriever_type == "auto_merging":
-            return AutoMergingRetriever(index=index, **kwargs)
-        elif retriever_type == "recursive":
-            return RecursiveRetriever(index=index, **kwargs)
-        elif retriever_type == "tree_select_leaf":
-            return TreeSelectLeafRetriever(index=index, **kwargs)
-        elif retriever_type == "summary_embedding":
-            return SummaryIndexEmbeddingRetriever(index=index, **kwargs)
-        elif retriever_type == "vector_auto":
-            return VectorIndexAutoRetriever(index=index, **kwargs)
-        elif retriever_type == "knowledge_graph_rag":
-            return KnowledgeGraphRAGRetriever(index=index, **kwargs)
-        else:
-            raise ValueError(f"未知のリトリバータイプ: {retriever_type}")
+    def create_retriever_tool(
+        retriever: BaseRetriever, 
+        name: str, 
+        description: str,
+        node_postprocessors: List[BaseNodePostprocessor] = None
+    ) -> RetrieverTool:
+        try:
+            tool = RetrieverTool.from_defaults(
+                retriever=retriever,
+                name=name,
+                description=description,
+                node_postprocessors=node_postprocessors
+            )
+            logger.info(f"RetrieverToolを作成: {name}")
+            return tool
+        except Exception as e:
+            logger.error(f"RetrieverTool作成エラー: {e}")
+            raise
+       
+    @staticmethod
+    def create_router_retriever(
+        selector: BaseSelector,
+        retriever_tools: Sequence[RetrieverTool],
+        llm: BaseLLM,
+    ) -> RouterRetriever:
+        return RouterRetriever.from_defaults(
+            selector=selector,
+            retriever_tools=retriever_tools,
+            llm=llm,
+        )
     
-
