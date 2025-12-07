@@ -347,7 +347,7 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
             Settings.llm = llm
             Settings.embed_model = embedding
             Settings.tokenizer = tokenizer
-            
+            Settings.prompt_helper = 
             
             # データベースとストレージの設定
             self._setup_database_manager()

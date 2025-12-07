@@ -13,6 +13,7 @@ from llama_index.core.extractors import (
     PydanticProgramExtractor
 )
 from .template_prompts import TemplatePromptSettings
+from output_parser_factory import PydanticOutputParserJp
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class StructuredTitleExtractor(BaseExtractor):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._program = LLMTextCompletionProgram.from_defaults(
+            output_parser=PydanticOutputParserJp(output_cls=TitleOutput),
             output_cls=TitleOutput,
             prompt_template_str=TemplatePromptSettings.JP_TITLE_NODE_TMPL,
             verbose=True
@@ -129,31 +131,31 @@ class StructuredKeywordExtractor(BaseExtractor):
 
 class ExtractorFactory:
     @staticmethod
-    def create_extractor(extractor_type: str, **kwargs):
+    def create_extractor(extractor_type: str, llm, **kwargs):
         extractors = {
             "title": ExtractorFactory._create_title_extractor,
             "summary": ExtractorFactory._create_summary_extractor,
             "keyword": ExtractorFactory._create_keyword_extractor,
             "questions_answered": ExtractorFactory._create_questions_answered_extractor,
-            "document_context": ExtractorFactory._create_document_context_extractor,
-            "pydantic_program": ExtractorFactory._create_pydantic_program_extractor,
-            "structured_title": ExtractorFactory._create_structured_title_extractor,
-            "structured_summary": ExtractorFactory._create_structured_summary_extractor,
-            "structured_keyword": ExtractorFactory._create_structured_keyword_extractor,
+            # "pydantic_program": ExtractorFactory._create_pydantic_program_extractor,
+            # "structured_title": ExtractorFactory._create_structured_title_extractor,
+            # "structured_summary": ExtractorFactory._create_structured_summary_extractor,
+            # "structured_keyword": ExtractorFactory._create_structured_keyword_extractor,
         }
         if extractor_type in extractors:
-            return extractors[extractor_type](**kwargs)
+            return extractors[extractor_type](llm=llm, **kwargs)
         else:
             raise ValueError(f"未知のエクストラクタータイプ: {extractor_type}")
     
     @staticmethod
-    def _create_title_extractor(nodes: int = 5):
+    def _create_title_extractor(llm, nodes: int = 5):
         """
         
         'document_title'
         """
         try:
             extractor = TitleExtractor(
+                llm=llm,
                 nodes = nodes,
                 node_template = TemplatePromptSettings.JP_TITLE_NODE_TMPL,
                 combine_template = TemplatePromptSettings.JP_TITLE_COMBINE_TMPL
@@ -165,13 +167,14 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def _create_summary_extractor():
+    def _create_summary_extractor(llm):
         """
         
         'section_summary'
         """
         try:
             extractor = SummaryExtractor(
+                llm=llm,
                 prompt_template=TemplatePromptSettings.JP_SUMMARY_EXTRACT_TMPL
             )
             logger.info("SummaryExtractorを作成")
@@ -181,13 +184,14 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def _create_keyword_extractor(keywords: int = 10):
+    def _create_keyword_extractor(llm, keywords: int = 10):
         """
         
         'excerpt_keywords'
         """
         try:
             extractor = KeywordExtractor(
+                llm=llm,
                 prompt_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE_TMPL,
                 keywords=keywords
             )
@@ -198,9 +202,10 @@ class ExtractorFactory:
             raise
     
     @staticmethod
-    def _create_questions_answered_extractor(questions: int = 5):
+    def _create_questions_answered_extractor(llm, questions: int = 5):
         try:
             extractor = QuestionsAnsweredExtractor(
+                llm=llm,
                 questions=questions,
                 prompt_template=TemplatePromptSettings.JP_QUESTION_GEN_TMPL
             )
@@ -208,18 +213,6 @@ class ExtractorFactory:
             return extractor
         except Exception as e:
             logger.error(f"QuestionsAnsweredExtractor作成エラー: {e}")
-            raise
-    
-    @staticmethod
-    def _create_document_context_extractor(context_str: str = ""):
-        try:
-            extractor = DocumentContextExtractor(
-                context_str=context_str
-            )
-            logger.info("DocumentContextExtractorを作成")
-            return extractor
-        except Exception as e:
-            logger.error(f"DocumentContextExtractor作成エラー: {e}")
             raise
     
     @staticmethod

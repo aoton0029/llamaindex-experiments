@@ -17,6 +17,7 @@ from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMo
 from llama_index.core.evaluation import BaseEvaluator
 from llama_index.core.base.llms.base import BaseLLM
 from llama_index.core.postprocessor.node import BaseNodePostprocessor
+from llama_index.core.selectors import BaseSelector
 
 
 logger = logging.getLogger(__name__)
@@ -67,12 +68,11 @@ class QueryEngineFactory:
     
     @staticmethod
     def create_router_query_engine(
-        selector_type: str,
+        selector: BaseSelector,
         query_engine_tools: Sequence[QueryEngineTool],
         query_engine_llm: BaseLLM,
         tree_summarize_llm: BaseLLM,
     ) -> RouterQueryEngine:
-        selector = SelectorFactory.create(selector_type=selector_type, llm=query_engine_llm)
         tree_summarizer = TreeSummarize(
             llm=tree_summarize_llm,
             summary_template=TemplatePromptSettings.JP_TREE_SUMMARIZE_PROMPT_SEL,
@@ -81,7 +81,7 @@ class QueryEngineFactory:
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=query_engine_tools,
-            llm = query_engine_llm,
+            llm=query_engine_llm,
             summarizer=tree_summarizer
         )
 

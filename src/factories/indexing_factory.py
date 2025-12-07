@@ -107,13 +107,16 @@ class TreeIndexBuilder(IndexBuilder):
         - doc_store: 要約
     """
     def __init__(self, 
+                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
-    
+        self.llm = llm
+
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = TreeIndex(
             nodes,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             summary_template=TemplatePromptSettings.JP_SUMMARY_PROMPT,
@@ -124,6 +127,7 @@ class TreeIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = TreeIndex.from_documents(
             documents,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             summary_template=TemplatePromptSettings.JP_SUMMARY_PROMPT,
@@ -140,16 +144,19 @@ class KeywordTableIndexBuilder(IndexBuilder):
         - index_store: キーワード → doc_idのマッピング
     """
     def __init__(self, 
+                 llm = None,
                  storage_context = None, 
                  show_progress = True, 
                  max_keywords_per_chunk=10):
         super().__init__(storage_context, show_progress)
+        self.llm = llm
         self.max_keywords_per_chunk = max_keywords_per_chunk
 
 
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = KeywordTableIndex(
             nodes,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             keyword_extract_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE,
@@ -160,6 +167,7 @@ class KeywordTableIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = KeywordTableIndex.from_documents(
             documents,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             keyword_extract_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE,
@@ -169,13 +177,16 @@ class KeywordTableIndexBuilder(IndexBuilder):
 
 class KnowledgeGraphIndexBuilder(IndexBuilder):
     def __init__(self, 
+                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
+        self.llm = llm
     
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = KnowledgeGraphIndex(
             nodes,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
         )
@@ -184,6 +195,7 @@ class KnowledgeGraphIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = KnowledgeGraphIndex.from_documents(
             documents,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
         )
@@ -199,13 +211,16 @@ class DocumentSummaryIndexBuilder(IndexBuilder):
         - index_store: インデックス構造
     """
     def __init__(self, 
+                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
-    
+        self.llm = llm
+
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = DocumentSummaryIndex(
             nodes,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             response_synthesizer=ResponseSynthesizerFactory.get(ResponseMode.TREE_SUMMARIZE),
@@ -216,6 +231,7 @@ class DocumentSummaryIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = DocumentSummaryIndex.from_documents(
             documents,
+            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             response_synthesizer=ResponseSynthesizerFactory.get(ResponseMode.TREE_SUMMARIZE),
