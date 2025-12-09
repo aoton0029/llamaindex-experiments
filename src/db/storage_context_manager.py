@@ -258,6 +258,19 @@ class StorageContextManager:
         indices = load_indices_from_storage(storage_context)
         logger.info(f"{len(indices)} 個のインデックスをロードしました")
         return indices
+
+    def load_indices_to_dict(self, context_name:str) -> Dict[str, BaseIndex]:
+        """インデックスのタイプごとに辞書で取得"""
+        storage_context = self.get_storage_context(context_name)
+        if not storage_context:
+            raise ValueError(f"StorageContext '{context_name}' が見つかりません")
+
+        indices = load_indices_from_storage(storage_context)
+        index_dict = {}
+        for index in indices:
+            index_type = type(index).__name__
+            index_dict[index_type] = index
+        return index_dict
         
     
     def drop_storage_context_by_name(self, context_name: str) -> None:
