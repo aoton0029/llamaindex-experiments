@@ -13,6 +13,7 @@ class ConfigPaths(BaseModel):
     tokenizer: str
     extractor: str
     templates: str
+    prompt_helper: str
 
 class ConfigManager:
     def __init__(self, config_dir: str):
@@ -25,6 +26,7 @@ class ConfigManager:
             tokenizer=str(self.config_dir / "tokenizer_configs.yaml"),
             extractor=str(self.config_dir / "extractor_configs.yaml"),
             templates=str(self.config_dir / "templates.yaml"),
+            prompt_helper=str(self.config_dir / "prompt_helper_configs.yaml"),
         )
         self._config_cache: Dict[str, Dict[str, Any]] = {}
         
@@ -51,6 +53,7 @@ class ConfigManager:
             "tokenizer": self.load_yaml(self.paths.tokenizer),
             "extractor": self.load_yaml(self.paths.extractor),
             "templates": self.load_yaml(self.paths.templates),
+            "prompt_helper": self.load_yaml(self.paths.prompt_helper),
         }
 
     def get_config(self, config_type: str, use_cache: bool = True) -> Dict[str, Any]:
@@ -86,12 +89,17 @@ class ConfigManager:
         config = self.get_config("llm")
         cfg_models = config.get("llm_config_models", {})
         return cfg_models.get(type_name, {})
-    
-    def get_llm_domain_kwargs(self, kwargs_name: str) -> Dict[str, Any]:
-        """LLMドメイン固有のkwargs設定を取得"""
+
+    def get_llm_domain_config(self) -> Dict[str, Any]:
         config = self.get_config("llm")
-        domain_kwargs = config.get("domain_kwargs_models", {})
-        return domain_kwargs.get(kwargs_name, {})
+        cfg_models = config.get("llm_domain_kwargs_models", {})
+        return cfg_models
+
+    def get_prompt_helper_config(self, type_name: str) -> Dict[str, Any]:
+        """プロンプトヘルパー設定を取得"""
+        config = self.get_config("prompt_helper")
+        cfg_models = config.get("prompt_helper_config_models", {})
+        return cfg_models.get(type_name, {})
 
     def get_indexing_config(self, type_name: str) -> Dict[str, Any]:
         config = self.get_config("indexing")
@@ -110,31 +118,7 @@ class ConfigManager:
         config = self.get_config("extractor")
         patterns = config.get("extractor_patterns", {})
         return patterns.get(pattern_name, {})
-    
-    def list_extractor_patterns(self) -> List[str]:
-        """利用可能なエクストラクタパターン名のリストを取得"""
-        config = self.get_config("extractor")
-        patterns = config.get("extractor_patterns", {})
-        return list(patterns.keys())
-    
-    def list_embedding_models(self) -> List[str]:
-        """利用可能な埋め込みモデル名のリストを取得"""
-        config = self.get_config("embedding")
-        models = config.get("embedding_config_models", {})
-        return list(models.keys())
-    
-    def list_llm_models(self) -> List[str]:
-        """利用可能なLLMモデル名のリストを取得"""
-        config = self.get_config("llm")
-        models = config.get("llm_config_models", {})
-        return list(models.keys())
-    
-    def list_llm_domain_kwargs(self) -> List[str]:
-        """利用可能なLLMドメインkwargs名のリストを取得"""
-        config = self.get_config("llm")
-        kwargs = config.get("domain_kwargs_models", {})
-        return list(kwargs.keys())
-    
+        
     # テンプレート関連
     def get_template_prompts(self) -> Dict[str, Any]:
         """テンプレートプロンプト設定を取得"""
