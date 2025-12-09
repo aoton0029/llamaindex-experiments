@@ -10,13 +10,14 @@ from models import (
 )
 from factories import (
     DocumentLoader,
-    ToolFactory,
     ResponseSynthesizerFactory,
-    IndexMetadataExtractor,
     QueryEngineFactory,
-    PostProcessorFactory
+    PostProcessorFactory,
+    LLMMultiSelectorJp,
+    LLMSingleSelectorJp,
+    TemplatePromptSettings,
+    DomainLLMSettings,
 )
-from factories.template_prompts import TemplatePromptSettings
 
 
 class DomainKnowledgeTestRunner(TestRunnerBase):
@@ -207,65 +208,59 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
         #     post_processor = PostProcessorFactory.create(pp_type, **pp_kwargs)
         #     post_processors.append(post_processor)
         #     self.monitor.log_event("query", f"Created {pp_type} post processor")
+
+        # query_engines = {}
+        # for index_type in indices.keys():
+        #     self.monitor.log_event("query", f"Available index: {index_type}")
+        #     query_engine_tools = QueryEngineFactory.create_query_engine_tools(
+        #         indices=[indices[index_type]],
+        #         query_engine_llm=self._get_llm_for_domain("synthesizer_response"),
+        #         response_synthesizer_llm=self._get_llm_for_domain("synthesizer_response"),
+        #         metadata_extractor=self.index_metadata_extractor,
+        #         response_mode=response_mode,
+        #     )
+
+        #     # クエリエンジンを作成
+        #     query_engine = QueryEngineFactory.create_router_query_engine(
+        #         selector=LLMSingleSelectorJp.from_defaults(llm=self._get_llm_for_domain("selector")),
+        #         query_engine_tools=query_engine_tools,
+        #         query_engine_llm=self._get_llm_for_domain("synthesizer_response"),
+        #         tree_summarize_llm=self._get_llm_for_domain("synthesizer_tree_summarize")
+        #     )
+        #     query_engines[index_type] = query_engine
+
+        # インデックスタイプとドメイン名のマッピング
         
         query_engine_tools = []
-        for idx, index in enumerate(indices):
-            index_query_engine = index.as_query_engine(
-                response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode),
-                # node_postprocessors = []
-            )
-
-            doc_name = "未設定"            
-            doc_desc = "未設定"
+        for index in indices:
+            index_type = type(index).__name__
+            self.monitor.log_event("query", f"Available index: {index_type}")
             
-            from llama_index.core import VectorStoreIndex
-            if isinstance(index, VectorStoreIndex):
-                milvus_client = self.db_manager.get_milvus_client()
-                node_ids = ",".join(f"\"{s}\"" for s in index.index_struct.nodes_dict.keys())                
-                values = milvus_client.get_field_values(
-                    "tech_column_terms", 
-                    f"id in [{node_ids}]", 
-                    ["id", "term_name", "doc_id"],
-                    1)
-                
-                if values:
-                    doc_name = values[0]["term_name"]
-                    doc_desc = f"「{doc_name}」に関する質問に答えます"
-            else:
-                if hasattr(index, 'ref_doc_info') and index.ref_doc_info:
-                    first_doc_info = next(iter(index.ref_doc_info.keys()))
-                    metadata = index.ref_doc_info[first_doc_info].metadata
-                    doc_name = metadata.get('term_name')
-                    doc_desc = f"「{doc_name}」に関する専門的な質問に答えます"
-                
-            print(f"{index.index_id} term_name:{doc_name} desc:{doc_desc}")
-            tool = ToolFactory.create_query_engine_tool(
-                query_engine=index_query_engine,
-                name=doc_name,
-                description=doc_desc
+            query_engine_tool = QueryEngineFactory.create_query_engine_tool_from_index(
+                index=index,
+                metadata_extractor=self.index_metadata_extractor,
+                response_mode=response_mode,
             )
-            
-            query_engine_tools.append(tool)
+            query_engine_tools.append(query_engine_tool)
+            self.monitor.log_event("query", f"Created query engine tool for index: {index_type}")
         
-        # クエリエンジンを作成
-        query_engine = QueryEngineFactory.create_router_query_engine(
-            selector_type="llm_single",
+        router_query_engine = QueryEngineFactory.create_router_query_engine(
+            selector=LLMSingleSelectorJp.from_defaults(),
             query_engine_tools=query_engine_tools,
-            response_mode=response_mode,
         )
 
-        # # ポストプロセッサを設定
+        # # ポストプロセッサを設定........................
         # if post_processors:
         #     query_engine._node_postprocessors = post_processors
-        
-        self.monitor.log_event("query", f"Created {query_engine_type} query engine")
-        
+
+        self.monitor.log_event("query", f"Created {router_query_engine} query engine")
+
         query_results = []
         # テストクエリを実行
         for i, query in enumerate(test_queries, 1):
             try:
                 self.monitor.log_event("query", f"Executing query {i}/{len(test_queries)}: {query}")
-                response = query_engine.query(query)
+                response = router_query_engine.query(query)
                 
                 query_result = {
                     "query": query,
@@ -303,7 +298,7 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
         self.monitor.log_event("query", "=== Query Phase Completed ===")
         return query_phase_result
     
-    def run_pattern(self, pattern_name: str):
+    def run_pattern(self, pattern_name: str, run_indexing: bool = True, run_query: bool = True):
         """
         指定されたパターンに従ってドメイン知識をストレージに保存し、RAGクエリを実行
         
@@ -312,17 +307,11 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
         """
         try: 
             self._setup_callback()
+            self._setup_template_prompts()
 
-            # 設定の読み込み
-            TemplatePromptSettings.initialize(self.config_manager.get_template_prompts())
             pattern_dict = self.test_pattern_manager.get_domain_knowledge_test_pattern(pattern_name)
             
-            self.monitor.start_test(
-                pattern_name, 
-                {
-                    "pattern": pattern_dict,
-                    "prompt": TemplatePromptSettings.get_templates_info(),
-                })
+            self.monitor.start_test(pattern_name, pattern_dict)
 
             self.monitor.log_event("setup", f"Loading pattern: {pattern_name}")
             
@@ -338,16 +327,18 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
             embedding_config_model = pattern_dict.get("embedding_config_model")
             tokenizer_config_model = pattern_dict.get("tokenizer_config_model")
             storage_config = pattern_dict.get("storage_config", {})
+            prompt_helper_config_model = pattern_dict.get("prompt_helper_config_model")
             
             # コンポーネントのセットアップ
-            llm = self._setup_llm(llm_config_model, "vllm_default")
+            llm = self._setup_llm(llm_config_model)
             embedding, dim = self._setup_embedding(embedding_config_model)
             tokenizer = self._setup_tokenizer(tokenizer_config_model)
-            
+            prompt_helper = self._setup_prompt_helper(tokenizer, prompt_helper_config_model)
+
             Settings.llm = llm
             Settings.embed_model = embedding
             Settings.tokenizer = tokenizer
-            Settings.prompt_helper = 
+            Settings.prompt_helper = prompt_helper
             
             # データベースとストレージの設定
             self._setup_database_manager()
@@ -359,18 +350,18 @@ class DomainKnowledgeTestRunner(TestRunnerBase):
             storage_config["vector_store"]["schema"] = schema
             storage_config["vector_store"]["dim"] = dim
             
-            # Phase 1: インデックス作成フェーズ
-            # indexing_result = self.run_indexing_phase(pattern_name, pattern_dict)
-            
-            # Phase 2: RAGクエリフェーズ（StorageContextから独立して実行）
-            query_result = self.run_query_phase(pattern_name, pattern_dict)
-            
-            # 最終結果をまとめる
-            final_result = {
-                "indexing": None, #indexing_result,
-                "query": query_result
-            }
-            
+            final_result = {}
+
+            if run_indexing:
+                # Phase 1: インデックス作成フェーズ
+                indexing_result = self.run_indexing_phase(pattern_name, pattern_dict)
+                final_result["indexing"] = indexing_result
+
+            if run_query:
+                # Phase 2: RAGクエリフェーズ（StorageContextから独立して実行）
+                query_result = self.run_query_phase(pattern_name, pattern_dict)
+                final_result["query"] = query_result
+
             self.monitor.log_event("complete", f"Pattern {pattern_name} completed successfully")
             self.monitor.end_test(True, final_result)
             
@@ -411,4 +402,4 @@ if __name__ == "__main__":
         result_dir=str(result_dir)
     )
     
-    runner.run_pattern('tech_column_basic')
+    runner.run_pattern('tech_column_basic', False, True)
