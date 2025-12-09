@@ -2,14 +2,14 @@ import logging
 from typing import Any, List, Dict, Optional
 from llama_index.core.selectors import LLMSingleSelector, LLMMultiSelector
 from llama_index.core.indices.base import BaseIndex
-from .output_parser_factory import SelectionOutputParserJp
 from llama_index.core.base.llms.base import BaseLLM
 from llama_index.core.postprocessor.node import BaseNodePostprocessor
-from .template_prompts import TemplatePromptSettings
-from .template_prompts import TemplatePromptSettings
 from llama_index.core.prompts.prompt_type import PromptType
 from llama_index.core.selectors.prompts import SingleSelectPrompt, MultiSelectPrompt
-from llama_index.core.settings import Settings
+
+from .output_parser_factory import SelectionOutputParserJp
+from .settings_template_prompts import TemplatePromptSettings
+from .settings_llm import DomainLLMSettings
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +18,10 @@ class LLMSingleSelectorJp(LLMSingleSelector):
     """日本語対応LLM Single Selector"""
     
     @classmethod
-    def from_defaults(
-        cls,
-        llm: Optional[BaseLLM] = None,
-    ) -> "LLMSingleSelectorJp":
+    def from_defaults(cls) -> "LLMSingleSelectorJp":
         """日本語デフォルト設定でインスタンスを作成"""
-        llm = llm or Settings.llm
-        prompt_template_str = TemplatePromptSettings.JP_SINGLE_SELECT_PROMPT_JSON_TMPL
+        llm = DomainLLMSettings.SELECTOR
+        prompt_template_str = TemplatePromptSettings.SINGLE_SELECT_PROMPT_TMPL
         output_parser = SelectionOutputParserJp()
         
         prompt = SingleSelectPrompt(
@@ -41,14 +38,10 @@ class LLMMultiSelectorJp(LLMMultiSelector):
     """日本語対応LLM Multi Selector"""
     
     @classmethod
-    def from_defaults(
-        cls,
-        llm: Optional[BaseLLM] = None,
-        max_outputs: Optional[int] = None,
-    ) -> "LLMMultiSelectorJp":
+    def from_defaults(cls,max_outputs: Optional[int] = None) -> "LLMMultiSelectorJp":
         """日本語デフォルト設定でインスタンスを作成"""
-        llm = llm or Settings.llm
-        prompt_template_str = TemplatePromptSettings.JP_MULTI_SELECT_PROMPT_JSON_TMPL
+        llm = DomainLLMSettings.SELECTOR
+        prompt_template_str = TemplatePromptSettings.MULTI_SELECT_PROMPT_TMPL
         output_parser = SelectionOutputParserJp()
         prompt_template_str = output_parser.format(prompt_template_str)
         

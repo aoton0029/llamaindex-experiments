@@ -11,13 +11,17 @@ from llama_index.core.query_engine import (
 )
 from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.tools import QueryEngineTool
-from .template_prompts import TemplatePromptSettings
 from llama_index.core.response_synthesizers import TreeSummarize
-from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
 from llama_index.core.evaluation import BaseEvaluator
 from llama_index.core.base.llms.base import BaseLLM
+from llama_index.core.indices.base import BaseIndex
+from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.postprocessor.node import BaseNodePostprocessor
 from llama_index.core.selectors import BaseSelector
+from .settings_template_prompts import TemplatePromptSettings
+from .settings_llm import DomainLLMSettings
+from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
+from .index_metadata_extractor import IndexMetadataExtractor
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +43,7 @@ class QueryEngineFactory:
         else:
             raise ValueError(f"未知のクエリエンジンタイプ: {query_engine_type}")
     
+    
     @staticmethod
     def create_query_engine_tool(query_engine: BaseQueryEngine, name: str, description: str) -> QueryEngineTool:
         try:
@@ -53,37 +58,80 @@ class QueryEngineFactory:
             logger.error(f"QueryEngineTool作成エラー: {e}")
             raise
     
+
+    @staticmethod
+    def create_query_engine_tool_from_index(
+        index: BaseIndex,
+        metadata_extractor: IndexMetadataExtractor,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
+    ) -> QueryEngineTool:
+        query_engine_llm = DomainLLMSettings.get_by_index(type(index).__name__)
+        response_synthesizer_llm = DomainLLMSettings.SYNTHESIZER_RESPONSE
+        index_query_engine = index.as_query_engine(
+            llm=query_engine_llm,
+            response_synthesizer=ResponseSynthesizerFactory.get(
+                response_mode=response_mode,
+                llm=response_synthesizer_llm,
+            ),
+            # node_postprocessors = []
+        )
+        metadata = metadata_extractor.extract_metadata(index)
+        name = metadata.get('term_name', "未設定")
+        description = f"「{name}」に関する質問に答えます" if name != "未設定" else "ドキュメントに関する質問に答えます"
+        return QueryEngineFactory.create_query_engine_tool(
+            query_engine=index_query_engine,
+            name=name,
+            description=description
+        ) 
+
+
+    @staticmethod
+    def create_query_engine_tools(
+        indices: List[BaseIndex],
+        metadata_extractor: IndexMetadataExtractor,
+        response_mode: ResponseMode = ResponseMode.COMPACT,
+    ):
+        tools = []
+        for index in indices:
+            tool = QueryEngineFactory.create_query_engine_tool_from_index(index, metadata_extractor, response_mode)
+            tools.append(tool)
+        return tools
+
+
     @staticmethod
     def create_retriever_query_engine(
         retriever: BaseRetriever,
         response_mode: ResponseMode = ResponseMode.COMPACT,
         node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
     ) -> RetrieverQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(
+            llm=DomainLLMSettings.QUERY_ENGINE_RETRIEVER,
+            response_mode=response_mode,
+        )
         return RetrieverQueryEngine(
             retriever=retriever,
             response_synthesizer=response_synthesizer,
             node_postprocessors=node_postprocessors
         )
     
+
     @staticmethod
     def create_router_query_engine(
         selector: BaseSelector,
         query_engine_tools: Sequence[QueryEngineTool],
-        query_engine_llm: BaseLLM,
-        tree_summarize_llm: BaseLLM,
     ) -> RouterQueryEngine:
         tree_summarizer = TreeSummarize(
-            llm=tree_summarize_llm,
-            summary_template=TemplatePromptSettings.JP_TREE_SUMMARIZE_PROMPT_SEL,
+            llm=DomainLLMSettings.SYNTHESIZER_TREE_SUMMARIZE,
+            summary_template=TemplatePromptSettings.TREE_SUMMARIZE_PROMPT_TMPL,
             verbose=True
         )
         return RouterQueryEngine(
             selector=selector,
             query_engine_tools=query_engine_tools,
-            llm=query_engine_llm,
+            llm=DomainLLMSettings.QUERY_ENGINE_ROUTER_SELECTOR,
             summarizer=tree_summarizer
         )
+    
 
     @staticmethod
     def create_retry_query_engine(
@@ -91,7 +139,10 @@ class QueryEngineFactory:
         evaluator: BaseEvaluator,
         response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> RetryQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(
+            llm=DomainLLMSettings.SYNTHESIZER_RESPONSE,
+            response_mode=response_mode
+        )
         return RetryQueryEngine(
             query_engine=query_engine,
             evaluator=evaluator,
@@ -104,7 +155,10 @@ class QueryEngineFactory:
         query_engines: List[BaseQueryEngine],
         response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> MultiStepQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(
+            llm=DomainLLMSettings.SYNTHESIZER_RESPONSE,
+            response_mode=response_mode
+        )
         return MultiStepQueryEngine(
             query_engines=query_engines,
             response_synthesizer=response_synthesizer
@@ -115,7 +169,10 @@ class QueryEngineFactory:
         query_engine: BaseQueryEngine,
         response_mode: ResponseMode = ResponseMode.COMPACT,
     ) -> TransformQueryEngine:
-        response_synthesizer = ResponseSynthesizerFactory.get(response_mode=response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(
+            llm=DomainLLMSettings.SYNTHESIZER_RESPONSE,
+            response_mode=response_mode
+        )
         return TransformQueryEngine(
             query_engine=query_engine,
             response_synthesizer=response_synthesizer

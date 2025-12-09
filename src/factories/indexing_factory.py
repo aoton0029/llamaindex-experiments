@@ -15,7 +15,8 @@ from llama_index.core.indices import MultiModalVectorStoreIndex
 from llama_index.core.storage.storage_context import StorageContext
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.query_engine import BaseQueryEngine
-from .template_prompts import TemplatePromptSettings
+from .settings_template_prompts import TemplatePromptSettings
+from .settings_llm import DomainLLMSettings
 from .response_synthesizer_factory import ResponseSynthesizerFactory, ResponseMode
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class SummaryIndexBuilder(IndexBuilder):
             nodes,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            text_qa_template=TemplatePromptSettings.JP_TEXT_QA_PROMPT
+            text_qa_template=TemplatePromptSettings.TEXT_QA_PROMPT
         )
         return self._index
     
@@ -92,7 +93,7 @@ class SummaryIndexBuilder(IndexBuilder):
             documents,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            text_qa_template=TemplatePromptSettings.JP_TEXT_QA_PROMPT
+            text_qa_template=TemplatePromptSettings.TEXT_QA_PROMPT
         )
         return self._index
 
@@ -107,31 +108,29 @@ class TreeIndexBuilder(IndexBuilder):
         - doc_store: 要約
     """
     def __init__(self, 
-                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
-        self.llm = llm
 
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = TreeIndex(
             nodes,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_TREE,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            summary_template=TemplatePromptSettings.JP_SUMMARY_PROMPT,
-            insert_prompt=TemplatePromptSettings.JP_INSERT_PROMPT,
+            summary_template=TemplatePromptSettings.SUMMARY_PROMPT,
+            insert_prompt=TemplatePromptSettings.INSERT_PROMPT,
         )
         return self._index
     
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = TreeIndex.from_documents(
             documents,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_TREE,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            summary_template=TemplatePromptSettings.JP_SUMMARY_PROMPT,
-            insert_prompt=TemplatePromptSettings.JP_INSERT_PROMPT,
+            summary_template=TemplatePromptSettings.SUMMARY_PROMPT,
+            insert_prompt=TemplatePromptSettings.INSERT_PROMPT,
         )
         return self._index
 
@@ -144,22 +143,20 @@ class KeywordTableIndexBuilder(IndexBuilder):
         - index_store: キーワード → doc_idのマッピング
     """
     def __init__(self, 
-                 llm = None,
                  storage_context = None, 
                  show_progress = True, 
                  max_keywords_per_chunk=10):
         super().__init__(storage_context, show_progress)
-        self.llm = llm
         self.max_keywords_per_chunk = max_keywords_per_chunk
 
 
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = KeywordTableIndex(
             nodes,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_KEYWORD_TABLE,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            keyword_extract_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE,
+            keyword_extract_template=TemplatePromptSettings.KEYWORD_EXTRACT_TEMPLATE,
             max_keywords_per_chunk=self.max_keywords_per_chunk
         )
         return self._index
@@ -167,26 +164,23 @@ class KeywordTableIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = KeywordTableIndex.from_documents(
             documents,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_KEYWORD_TABLE,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
-            keyword_extract_template=TemplatePromptSettings.JP_KEYWORD_EXTRACT_TEMPLATE,
+            keyword_extract_template=TemplatePromptSettings.KEYWORD_EXTRACT_TEMPLATE,
             max_keywords_per_chunk=self.max_keywords_per_chunk
         )
         return self._index
 
 class KnowledgeGraphIndexBuilder(IndexBuilder):
     def __init__(self, 
-                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
-        self.llm = llm
     
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = KnowledgeGraphIndex(
             nodes,
-            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
         )
@@ -195,7 +189,6 @@ class KnowledgeGraphIndexBuilder(IndexBuilder):
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = KnowledgeGraphIndex.from_documents(
             documents,
-            llm=self.llm,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
         )
@@ -211,31 +204,29 @@ class DocumentSummaryIndexBuilder(IndexBuilder):
         - index_store: インデックス構造
     """
     def __init__(self, 
-                 llm = None,
                  storage_context = None, 
                  show_progress = True):
         super().__init__(storage_context, show_progress)
-        self.llm = llm
 
     def build_from_nodes(self, nodes: List[BaseNode]) -> BaseIndex:
         self._index = DocumentSummaryIndex(
             nodes,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_DOCUMENT_SUMMARY,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             response_synthesizer=ResponseSynthesizerFactory.get(ResponseMode.TREE_SUMMARIZE),
-            summary_query=TemplatePromptSettings.JP_SUMMARY_QUERY,
+            summary_query=TemplatePromptSettings.SUMMARY_QUERY_TMPL,
         )
         return self._index
     
     def build_from_documents(self, documents: List[Document]) -> BaseIndex:
         self._index = DocumentSummaryIndex.from_documents(
             documents,
-            llm=self.llm,
+            llm=DomainLLMSettings.INDEX_DOCUMENT_SUMMARY,
             storage_context=self.storage_context,
             show_progress=self.show_progress,
             response_synthesizer=ResponseSynthesizerFactory.get(ResponseMode.TREE_SUMMARIZE),
-            summary_query=TemplatePromptSettings.JP_SUMMARY_QUERY,
+            summary_query=TemplatePromptSettings.SUMMARY_QUERY_TMPL,
         )
         return self._index
 
