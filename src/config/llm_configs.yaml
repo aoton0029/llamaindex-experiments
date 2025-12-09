@@ -29,13 +29,19 @@ llm_config_models:
     model_name: "/models/Llama-3-ELYZA-JP-8B-AWQ"
     base_url: "http://vllm-llm:8000/v1"
 
+llm_domain_kwargs_models:
+  default:
+    temperature: 0.0
+    max_tokens: 1024
+    timeout: 180
+    additional_kwargs:
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
 
-# LlamaIndexの各クラス・用途ごとのLLM制御設定
-domain_kwargs_models:
   # ==========================================
-  # メタデータ抽出系（Extractors）
+  # Extractor系
   # ==========================================
-  
+
   # TitleExtractor - タイトル生成（短く簡潔に）
   extractor_title:
     temperature: 0.0
@@ -45,7 +51,7 @@ domain_kwargs_models:
       presence_penalty: 1.0  # 繰り返し抑制
       frequency_penalty: 1.0  # 頻出抑制
       stop: ["\n"]  # 改行で停止
-  
+
   # SummaryExtractor - 要約生成（適度な長さ）
   extractor_summary:
     temperature: 0.0
@@ -54,7 +60,7 @@ domain_kwargs_models:
     additional_kwargs:
       presence_penalty: 1.0
       frequency_penalty: 1.0
-  
+
   # KeywordExtractor - キーワード抽出（短く）
   extractor_keyword:
     temperature: 0.0
@@ -64,7 +70,7 @@ domain_kwargs_models:
       presence_penalty: 1.0
       frequency_penalty: 1.0
       stop: ["\n"]
-  
+
   # QuestionsAnsweredExtractor - 質問生成
   extractor_qa:
     temperature: 0.0
@@ -75,23 +81,23 @@ domain_kwargs_models:
       frequency_penalty: 1.0
 
   # ==========================================
-  # クエリエンジン・Selector系
+  # Selector系
   # ==========================================
-  
-  # LLMSingleSelector / LLMMultiSelector - ツール選択（確定的）
+
+  # LLMSingleSelector / LLMMultiSelector - 単一選択 / 複数選択
   selector:
     temperature: 0.0
     max_tokens: 256
     timeout: 180
     additional_kwargs:
-      presence_penalty: 0.0  # 選択タスクは繰り返しペナルティ不要
+      presence_penalty: 0.0
       frequency_penalty: 0.0
-      stop: ["\n"]
-  
+
+
   # ==========================================
   # Response Synthesizer系
   # ==========================================
-  
+
   # ResponseSynthesizer - 回答生成（標準）
   synthesizer_response:
     temperature: 0.0
@@ -100,7 +106,7 @@ domain_kwargs_models:
     additional_kwargs:
       presence_penalty: 0.0
       frequency_penalty: 0.0
-  
+
   # TreeSummarize - 階層的要約
   synthesizer_tree_summarize:
     temperature: 0.0
@@ -109,7 +115,7 @@ domain_kwargs_models:
     additional_kwargs:
       presence_penalty: 0.5  # 軽い繰り返し抑制
       frequency_penalty: 0.5
-  
+
   # Refine - 段階的改善
   synthesizer_refine:
     temperature: 0.0
@@ -120,64 +126,88 @@ domain_kwargs_models:
       frequency_penalty: 0.3
 
   # ==========================================
-  # Query Transformation系
+  # Index別の設定
   # ==========================================
-  
-  # Query Rewrite/Transform - クエリ変換
-  query_transform:
+  # VectorStoreIndex - ベクトル検索ベース（標準的な回答生成）
+  index_vector_store:
+    temperature: 0.0
+    max_tokens: 1024
+    timeout: 180
+    additional_kwargs:
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
+
+  # SummaryIndex - 要約ベース（全体を見渡す必要がある）
+  index_summary:
+    temperature: 0.0
+    max_tokens: 2048
+    timeout: 300
+    additional_kwargs:
+      presence_penalty: 0.3
+      frequency_penalty: 0.3
+
+  # TreeIndex - 階層的検索（構造化された回答）
+  index_tree:
+    temperature: 0.0
+    max_tokens: 1536
+    timeout: 240
+    additional_kwargs:
+      presence_penalty: 0.2
+      frequency_penalty: 0.2
+
+  # KeywordTableIndex - キーワード検索ベース（簡潔な回答）
+  index_keyword_table:
+    temperature: 0.0
+    max_tokens: 512
+    timeout: 180
+    additional_kwargs:
+      presence_penalty: 0.5
+      frequency_penalty: 0.5
+      stop: ["\n\n"]
+
+  # KnowledgeGraphIndex - 知識グラフベース（関連性重視）
+  index_knowledge_graph:
     temperature: 0.1
+    max_tokens: 1024
+    timeout: 180
+    additional_kwargs:
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
+
+  # DocumentSummaryIndex - ドキュメント要約ベース
+  index_document_summary:
+    temperature: 0.0
+    max_tokens: 1536
+    timeout: 240
+    additional_kwargs:
+      presence_penalty: 0.3
+      frequency_penalty: 0.3
+
+  # ==========================================
+  # Query Engine別の設定
+  # ==========================================
+
+  # RouterQueryEngine用のメタ判断（どのインデックスを使うか）
+  query_engine_router_selector:
+    temperature: 0.0
+    max_tokens: 512
+    timeout: 180
+    additional_kwargs:
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
+      stop: ["\n"]
+
+  # SubQuestionQueryEngine - サブクエリ生成
+  query_engine_sub_question:
+    temperature: 0.0
     max_tokens: 512
     timeout: 180
     additional_kwargs:
       presence_penalty: 0.5
       frequency_penalty: 0.5
 
-  # ==========================================
-  # Agent系
-  # ==========================================
-  
-  # ReActAgent - 推論＋行動
-  agent_react:
-    temperature: 0.0
-    max_tokens: 2048
-    timeout: 300
-    additional_kwargs:
-      presence_penalty: 0.0
-      frequency_penalty: 0.0
-  
-  # FunctionAgent - 関数呼び出し
-  agent_function:
-    temperature: 0.0
-    max_tokens: 2048
-    timeout: 300
-    additional_kwargs:
-      presence_penalty: 0.0
-      frequency_penalty: 0.0
-
-  # ==========================================
-  # Evaluation系
-  # ==========================================
-  
-  # FaithfulnessEvaluator - 忠実性評価
-  evaluator_faithfulness:
-    temperature: 0.0
-    max_tokens: 512
-    timeout: 180
-    additional_kwargs:
-      presence_penalty: 0.0
-      frequency_penalty: 0.0
-  
-  # RelevancyEvaluator - 関連性評価
-  evaluator_relevancy:
-    temperature: 0.0
-    max_tokens: 512
-    timeout: 180
-    additional_kwargs:
-      presence_penalty: 0.0
-      frequency_penalty: 0.0
-  
-  # CorrectnessEvaluator - 正確性評価
-  evaluator_correctness:
+  # RetrieverQueryEngine - 基本的な検索＋生成
+  query_engine_retriever:
     temperature: 0.0
     max_tokens: 1024
     timeout: 180
@@ -185,24 +215,11 @@ domain_kwargs_models:
       presence_penalty: 0.0
       frequency_penalty: 0.0
 
-  # ==========================================
-  # Dataset Generation系
-  # ==========================================
-  
-  # RagDatasetGenerator - 質問生成
-  dataset_question_gen:
-    temperature: 0.3
-    max_tokens: 512
-    timeout: 180
-    additional_kwargs:
-      presence_penalty: 0.8  # 多様性を確保
-      frequency_penalty: 0.8
-  
-  # RagDatasetGenerator - 回答生成
-  dataset_answer_gen:
-    temperature: 0.0
-    max_tokens: 1024
-    timeout: 180
+  # MultiStepQueryEngine - 複数ステップの推論
+  query_engine_multi_step:
+    temperature: 0.1
+    max_tokens: 1536
+    timeout: 240
     additional_kwargs:
       presence_penalty: 0.0
       frequency_penalty: 0.0

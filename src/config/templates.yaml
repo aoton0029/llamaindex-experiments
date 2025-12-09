@@ -4,19 +4,19 @@
 template_prompts:
   # Simple Input Templates
   simple_input:
-    jp_simple_input_tmpl: "{query_str}"
+    JP_SIMPLE_INPUT_TMPL: "{query_str}"
   
   # Text QA Templates
   text_qa:
     # ChatMessage based prompts
-    chat_system_prompt: |
+    CHAT_SYSTEM_PROMPT: |
       あなたは世界中で信頼されている専門のQ&Aシステムです。
       常に提供されたコンテキスト情報のみを用いて質問に回答し、事前の知識は使用しないでください。
       従うべきルール:
       1. 回答内で与えられたコンテキストを直接参照しないでください。
       2. 「コンテキストに基づいて...」や「コンテキスト情報...」のような表現を避けてください。
     
-    chat_user_prompt: |
+    CHAT_USER_PROMPT: |
       以下にコンテキスト情報を示します。
       ---------------------
       {context_str}
@@ -25,7 +25,7 @@ template_prompts:
       質問: {query_str}
       回答: 
     
-    jp_text_qa_tmpl: |
+    JP_TEXT_QA_TMPL: |
       あなたは正確で信頼性の高い情報を提供する優秀なアシスタントです。
       以下のルールに厳密に従ってください。
 
@@ -50,14 +50,14 @@ template_prompts:
   # Tree Summarize Templates
   tree_summarize:
     # ChatMessage based prompts
-    chat_system_prompt: |
+    CHAT_SYSTEM_PROMPT: |
       あなたは世界中で信頼されている専門のQ&Aシステムです。
       常に提供されたコンテキスト情報のみを用いて質問に回答し、事前の知識は使用しないでください。
       従うべきルール:
       1. 回答内で与えられたコンテキストを直接参照しないでください。
       2. 「コンテキストに基づいて...」や「コンテキスト情報...」のような表現を避けてください。
     
-    chat_user_prompt: |
+    CHAT_USER_PROMPT: |
       複数のソースからのコンテキスト情報を以下に示します。
       ---------------------
       {context_str}
@@ -66,7 +66,7 @@ template_prompts:
       質問: {query_str}
       回答: 
     
-    jp_tree_summarize_tmpl: |
+    JP_TREE_SUMMARIZE_TMPL: |
       あなたは複数の情報源を統合して正確に要約するアシスタントです。
 
       # 指示
@@ -91,7 +91,7 @@ template_prompts:
   # Refine Templates
   refine:
    # ChatMessage based prompts
-    chat_user_prompt: |
+    CHAT_USER_PROMPT: |
       あなたは既存の回答を洗練する際、厳密に次の2つのモードで動作する専門のQ&Aシステムです：
       1. 新しいコンテキストを用いて元の回答を**書き直す**。
       2. 新しいコンテキストが有用でない場合は元の回答を**繰り返す**。
@@ -102,7 +102,7 @@ template_prompts:
       元の回答: {existing_answer}
       新しい回答: 
     
-    jp_refine_tmpl: |
+    JP_REFINE_TMPL: |
       あなたは質問に対して正確かつ簡潔に回答するアシスタントです。
 
       # 指示
@@ -126,9 +126,9 @@ template_prompts:
   # Refine Table Context Templates
   refine_table_context:
     # ChatMessage based prompts (3 messages)
-    chat_query_prompt: "{query_str}"
-    chat_existing_answer_prompt: "{existing_answer}"
-    chat_context_prompt: |
+    CHAT_QUERY_PROMPT: "{query_str}"
+    CHAT_EXISTING_ANSWER_PROMPT: "{existing_answer}"
+    CHAT_CONTEXT_PROMPT: |
       以下にテーブルのスキーマを示します。
       ---------------------
       {schema}
@@ -138,7 +138,7 @@ template_prompts:
       テーブルのスキーマとコンテキスト情報を用いて元の回答を改善してください。
       コンテキストが有用でない場合は元の回答を返してください。
     
-    jp_refine_table_context_tmpl: |
+    JP_REFINE_TABLE_CONTEXT_TMPL: |
       以下にテーブルのスキーマを示します。
       ---------------------
       {schema}
@@ -152,7 +152,7 @@ template_prompts:
 
   # Selection Templates
   selection:
-    jp_single_select_tmpl: |
+    JP_SINGLE_SELECT_TMPL: |
       あなたは高度な情報検索システムのクエリルーターです。
       質問を分析し、最も適切な情報源を1つだけ選択する専門家です。
       以下の指示に厳密に従ってください。
@@ -177,7 +177,7 @@ template_prompts:
       選択肢：{context_list}
       回答：
 
-    jp_single_select_json_tmpl: |
+    JP_SINGLE_SELECT_JSON_TMPL: |
       あなたは高度な情報検索システムのクエリルーターです。
       質問を分析し、最も適切な情報源を1つだけ選択し、JSON形式で回答する専門家です。
 
@@ -225,7 +225,8 @@ template_prompts:
 
       出力:
     
-    jp_multi_select_tmpl: |
+    
+    JP_MULTI_SELECT_TMPL: |
       あなたは情報検索システムのマルチクエリルーターです。
       質問を分析し、適切な情報源を複数選択する専門家です。
       以下の指示に厳密に従ってください。
@@ -254,7 +255,7 @@ template_prompts:
       選択肢：{context_list}
       回答：
 
-    jp_multi_select_json_tmpl: |
+    JP_MULTI_SELECT_JSON_TMPL: |
       あなたは情報検索システムのマルチクエリルーターです。
       質問を分析し、適切な情報源を複数選択し、JSON形式で回答する専門家です。
 
@@ -295,7 +296,6 @@ template_prompts:
       2. データ分析ライブラリ - pandas、numpy、matplotlibの使い方
       3. 機械学習入門 - scikit-learnを使った機械学習の基礎
       4. Web開発フレームワーク - Django、Flaskなどのフレームワーク解説
-
       出力:
       [
           {{
@@ -318,9 +318,35 @@ template_prompts:
 
       出力:
 
+    JP_SELECTION_FORMAT_JSON_TMPL: |      
+      # 重要：出力形式の変更
+      上記の指示は無視し、以下のJSON形式で回答してください。
+      
+      【出力形式】
+      必ずJSON配列形式で出力してください。番号のみの回答は不可です。
+      
+      例:
+      [
+          {{
+              "choice": 1,
+              "reason": "選択の理由を具体的に記述"
+          }},
+          {{
+              "choice": 2,
+              "reason": "選択の理由を具体的に記述"
+          }}
+      ]
+      
+      【注意事項】
+      - 必ず有効なJSON配列として出力すること
+      - 各選択には必ず理由(reason)を付けること
+      - 選択番号(choice)は整数で指定すること
+      - 説明文や余計なテキストは含めないこと
+
+
   # Extractor Templates
   extractor:
-    jp_title_node_template_tmpl: |
+    JP_TITLE_NODE_TEMPLATE_TMPL: |
       あなたは与えられた日本語テキストから「最適なタイトル」を抽出・生成するモデルです。
       以下の指示に厳密に従ってください。
 
@@ -341,7 +367,7 @@ template_prompts:
       タイトル：
 
 
-    jp_title_combine_template_tmpl: |
+    JP_TITLE_COMBINE_TEMPLATE_TMPL: |
       あなたは複数の文書タイトルを分析し、その本質を捉えた統合タイトルを生成する専門家です。
       以下の指示に厳密に従ってください。
 
@@ -367,7 +393,7 @@ template_prompts:
       統合タイトル：
 
 
-    jp_summary_extract_template_tmpl: |
+    JP_SUMMARY_EXTRACT_TEMPLATE_TMPL: |
       あなたは日本語テキストを簡潔かつ正確に要約するモデルです。
       以下の指示に厳密に従ってください。
 
@@ -390,7 +416,7 @@ template_prompts:
       要約：
 
 
-    jp_keyword_extract_template_tmpl: |
+    JP_KEYWORD_EXTRACT_TEMPLATE_TMPL: |
       あなたは与えられた日本語テキストから「重要キーワード」を抽出し、半角カンマで区切って返すモデルです。
       以下の指示に厳密に従ってください。
 
@@ -412,7 +438,7 @@ template_prompts:
       テキスト：{context_str}
       キーワード：
 
-    jp_question_gen_tmpl: |
+    JP_QUESTION_GEN_TMPL: |
       あなたは与えられたテキストから質問を生成する専門家です。
       以下の指示に厳密に従ってください。
       
@@ -437,7 +463,7 @@ template_prompts:
 
   # Evaluation Templates
   evaluation:
-    jp_question_generation_prompt: |
+    JP_QUESTION_GENERATION_PROMPT: |
       以下のコンテキストから質問を生成してください。
       
       【コンテキスト】
@@ -452,7 +478,7 @@ template_prompts:
       【出力指示】
       質問:{query_str}
     
-    jp_question_gen_query: |
+    JP_QUESTION_GEN_QUERY: |
       与えられた文書から理解度を測るための質問を3個生成してください。
       
       【生成要件】
@@ -467,7 +493,7 @@ template_prompts:
       2.<質問文>
       3.<質問文>
     
-    jp_eval_template_tmpl: |
+    JP_EVAL_TEMPLATE_TMPL: |
       以下の情報がコンテキストによって支持されているかを判断してください。
       
       【判断基準】
@@ -487,7 +513,7 @@ template_prompts:
       
       回答: 
 
-    jp_refine_template_tmpl: |
+    JP_REFINE_TEMPLATE_TMPL: |
       既存の評価結果を、追加コンテキストを用いて更新してください。
       
       【評価対象の情報】
@@ -510,7 +536,7 @@ template_prompts:
       
       更新後の回答: 
     
-    jp_summary_query: |
+    JP_SUMMARY_QUERY_TMPL: |
       ドキュメントを分析し、包括的な要約を作成してください。
 
       # 分析項目
@@ -534,7 +560,7 @@ template_prompts:
       - 重要度の高い情報を優先すること
 
     
-    jp_summary_prompt_tmpl: |
+    JP_SUMMARY_PROMPT_TMPL: |
       あなたは正確かつ簡潔な要約を生成する専門家です。
       以下の指示に厳密に従ってください。
       
@@ -553,7 +579,7 @@ template_prompts:
       テキスト：{context_str} 
       要約:
     
-    jp_insert_prompt_tmpl: |
+    JP_INSERT_PROMPT_TMPL: |
       【既存の要約情報】
       以下に、1から{num_chunk}までの番号付きリストで既存の要約が提供されています。各番号は特定のコンテキストの要約を表しています。
       --------------------
