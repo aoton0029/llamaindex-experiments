@@ -23,7 +23,10 @@ from factories import (
     IndexBuilder,
     ExtractorFactory,
     PreProcessorFactory,
-    BasePreProcessor
+    BasePreProcessor,
+    IndexMetadataExtractor,
+    TemplatePromptSettings,
+    DomainLLMSettings,
 )
 from db import (
     DatabaseManager,
@@ -32,13 +35,6 @@ from db import (
     StorageContextManager,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-    ]
-)
 
 logger = logging.getLogger(__name__)
 
@@ -66,38 +62,37 @@ class TestRunnerBase(ABC):
         self.monitor = TestMonitor(result_dir)
         self.db_manager: DatabaseManager = None
         self.storage_context_manager: StorageContextManager = None
+        self.index_metadata_extractor: IndexMetadataExtractor = None
 
-    def _setup_llm(self, llm_config_model_name: str, llm_domain_kwargs_model_name: str) -> BaseLLM:
+    def _setup_template_prompts(self):
+        """
+        テンプレートプロンプト設定をセットアップ
+        """
+        try:
+            self.monitor.log_event("setup", "Setting up template prompt settings...")
+            TemplatePromptSettings.initialize(self.config_manager.get_template_prompts())
+            self.monitor.log_event("setup", "Set up template prompt settings")
+        except Exception as e:
+            logger.error(f"Template prompt settings setup failed: {e}")
+            raise
+
+    def _setup_llm(self, llm_config_model_name: str) -> BaseLLM:
         """
         LLMをセットアップ
         
         Args:
             llm_config_model_name: LLM設定モデル名
-            
-        Returns:
-            LLMインスタンス
         """
         try:
-            self.monitor.log_event("setup", "Setting up LLM...")
+            self.monitor.log_event("setup", "Setting up domain-specific LLMs...")
             llm_config = self.config_manager.get_llm_config(llm_config_model_name)
-            llm_domain_kwargs = self.config_manager.get_llm_domain_kwargs(llm_domain_kwargs_model_name)
-            
-            backend = llm_config["backend"]
-            base_url = llm_config["base_url"]
-            model_name = llm_config["model_name"]
-            
-            llm = LLMFactory.create(
-                backend=backend,
-                model_name=model_name,
-                base_url=base_url,
-                **llm_domain_kwargs
-            )
-
-            self.monitor.log_event("setup", f"Set up LLM: {model_name}")
-            return llm
+            domain_configs = self.config_manager.get_llm_domain_config()
+            DomainLLMSettings.initialize(llm_config, domain_configs)
+            self.monitor.log_event("setup", "Set up domain-specific LLMs")
+            return DomainLLMSettings.default()
         except Exception as e:
             logger.error(f"LLM setup failed: {e}")
-            raise
+            raise        
 
     def _setup_embedding(self, embedding_config_model_name: str) -> Tuple[BaseEmbedding, int]:
         """
@@ -155,7 +150,7 @@ class TestRunnerBase(ABC):
     def _setup_indexbuilder(
         self, 
         indexing_type: str, 
-        storage_context: StorageContext
+        storage_context: StorageContext,
     ) -> IndexBuilder:
         """
         インデックスビルダーをセットアップ
@@ -163,17 +158,13 @@ class TestRunnerBase(ABC):
         Args:
             indexing_type: インデックスタイプ
             storage_context: ストレージコンテキスト
+            llm: LLMインスタンス（オプション）
             
         Returns:
             IndexBuilderインスタンス
         """
         try:
             self.monitor.log_event("setup", "Setting up index builder...")
-            # indexing_config = self.config_manager.get_config("indexing")
-            # index_models = indexing_config.get("indexing_config_models", {})
-            # pattern_config = index_models.get(indexing_type, {})
-            
-            # builder_type = pattern_config.get("type")
             index_builder = IndexBuilderFactory.create(
                 builder_type=indexing_type,
                 storage_context=storage_context,
@@ -210,6 +201,37 @@ class TestRunnerBase(ABC):
             logger.error(f"Chunker setup failed: {e}")
             raise
     
+    def _setup_prompt_helper(self, tokenizer, prompt_helper_config_model_name: str):
+        """
+        プロンプトヘルパーをセットアップ
+        
+        Args:
+            prompt_helper_config_model_name: プロンプトヘルパー設定モデル名
+            
+        Returns:
+            PromptHelperインスタンス
+        """
+        try:
+            from llama_index.core import PromptHelper
+            
+            self.monitor.log_event("setup", "Setting up prompt helper...")
+            prompt_helper_config = self.config_manager.get_prompt_helper_config(prompt_helper_config_model_name)
+            
+            prompt_helper = PromptHelper(
+                context_window=prompt_helper_config.get("context_window", 4096),
+                num_output=prompt_helper_config.get("num_output", 512),
+                chunk_overlap_ratio=prompt_helper_config.get("chunk_overlap_ratio", 0.1),
+                chunk_size_limit=prompt_helper_config.get("chunk_size_limit"),
+                separator=prompt_helper_config.get("separator", " "),
+                tokenizer=tokenizer.decode
+            )
+            
+            self.monitor.log_event("setup", f"Set up prompt helper: {prompt_helper_config_model_name}")
+            return prompt_helper
+        except Exception as e:
+            logger.error(f"Prompt helper setup failed: {e}")
+            raise
+    
     def _setup_extractors(self, extractor_pattern_name: str) -> List[BaseExtractor]:
         """
         複数のエクストラクタをセットアップ
@@ -243,15 +265,13 @@ class TestRunnerBase(ABC):
         """
         前処理をセットアップ
         
-        Args:
-            use_schema_based: スキーマベースの前処理を使用するか
-            
         Returns:
             前処理パイプライン
         """
         try:
             self.monitor.log_event("setup", "Setting up preprocessor...")
-            
+            # TODO: 前処理の実装
+            preprocessor = None  # PreProcessorFactory.create(...)
             
             self.monitor.log_event("setup", "Set up preprocessor")
             return preprocessor
@@ -289,6 +309,10 @@ class TestRunnerBase(ABC):
                     self.monitor.log_event("setup", f"Database {db_name}: FAILED", level="warning")
             
             self.monitor.log_event("setup", "Set up database manager")
+
+            self.index_metadata_extractor = IndexMetadataExtractor(self.db_manager.get_milvus_client())
+            self.monitor.log_event("setup", "Set up index metadata extractor")
+
             return self.db_manager
         except Exception as e:
             logger.error(f"Database manager setup failed: {e}")
@@ -455,11 +479,6 @@ class TestRunnerBase(ABC):
         except Exception as e:
             self.monitor.log_event("warning", f"Failed to: {e}")
             raise
-    
-    def _flush_handler(self):
-        from llama_index.core import global_handler
-        if global_handler:
-            print("flushing langfuse traces...")
-            
-            
-            
+
+
+
