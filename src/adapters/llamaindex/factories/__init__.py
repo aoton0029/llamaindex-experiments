@@ -12,8 +12,6 @@ from .selector_factory import LLMSingleSelectorJp, LLMMultiSelectorJp
 from .query_engine_factory import QueryEngineFactory
 from .retriever_factory import RetrieverFactory
 from .index_metadata_extractor import IndexMetadataExtractor
-from .settings_llm import DomainLLMSettings
-from .settings_template_prompts import TemplatePromptSettings
 
 __all__ = [
     "LLMFactory",
@@ -35,6 +33,4 @@ __all__ = [
     "QueryEngineFactory",
     "RetrieverFactory",
     "IndexMetadataExtractor",
-    "DomainLLMSettings",
-    "TemplatePromptSettings",
 ]

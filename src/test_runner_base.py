@@ -12,10 +12,10 @@ from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms.llm import BaseLLM
 from llama_index.core.extractors import BaseExtractor
 from transformers import AutoTokenizer
-from config_manager import ConfigManager
-from test_pattern_manager import TestPatternManager
+from llamaindex_tests.config_manager import ConfigManager
+from llamaindex_tests.test_pattern_manager import TestPatternManager
 from test_monitor import TestMonitor
-from factories import (
+from adapters.llamaindex.factories import (
     LLMFactory,
     EmbeddingFactory,
     ChunkerFactory,
@@ -25,9 +25,8 @@ from factories import (
     PreProcessorFactory,
     BasePreProcessor,
     IndexMetadataExtractor,
-    TemplatePromptSettings,
-    DomainLLMSettings,
 )
+from adapters.llamaindex.settings import DomainLLMSettings, TemplatePromptSettings
 from db import (
     DatabaseManager,
     DatabaseConfig,
@@ -89,7 +88,7 @@ class TestRunnerBase(ABC):
             domain_configs = self.config_manager.get_llm_domain_config()
             DomainLLMSettings.initialize(llm_config, domain_configs)
             self.monitor.log_event("setup", "Set up domain-specific LLMs")
-            return DomainLLMSettings.default()
+            return DomainLLMSettings.DEFAULT
         except Exception as e:
             logger.error(f"LLM setup failed: {e}")
             raise        

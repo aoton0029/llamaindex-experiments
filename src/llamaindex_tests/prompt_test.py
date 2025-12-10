@@ -11,7 +11,7 @@ from factories import (
     DocumentLoader,
     
 )
-from config_manager import ConfigManager
+from llamaindex_tests.config_manager import ConfigManager
 from factories.template_prompts import TemplatePromptSettings
 from llama_index.core import Settings
 
