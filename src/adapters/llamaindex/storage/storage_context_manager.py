@@ -5,7 +5,7 @@ from llama_index.core.storage.storage_context import StorageContext
 from llama_index.core import load_index_from_storage, load_indices_from_storage
 
 from src.infrastructure.vector_stores.manager import VectorStoreManager
-from src.infrastructure.document_stores.manager import DocumentStoreManager
+from src.infrastructure.doc_stores.manager import DocumentStoreManager
 from src.infrastructure.graph_stores.manager import GraphStoreManager
 from src.infrastructure.index_stores.manager import IndexStoreManager
 from .config import StorageContextConfig
