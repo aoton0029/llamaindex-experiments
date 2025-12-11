@@ -10,53 +10,40 @@ logger = logging.getLogger(__name__)
 class _DomainLLMSettings:
     """ドメイン別LLM設定"""
     
-    _llm_config: Optional[Dict[str, Any]] = None
-    _configs: Optional[Dict[str, Any]] = None
+    _llm_config: Dict[str, Any] = {}
     _domain_kwargs: Dict[str, Dict[str, Any]] = {}
     _domain_llm_cache: Dict[str, BaseLLM] = {}
     _loaded: bool = False
     
-    def initialize(self, llm_model_name: str, config_file_path: str = None):
-        """ConfigManagerを設定してドメイン設定を初期化"""
-        self._loaded = False
-        with open(config_file_path, 'r', encoding='utf-8') as f:
-            import yaml
-            self._configs = yaml.safe_load(f) or {}
-        self._llm_config = self._configs.get("llm_config", {})
-        self._domain_llm_cache.clear()
-        self._load_domain_kwargs()
-        self._create_domain_llm_instances()
-    
-
-    def _load_domain_kwargs(self):
-        """YAMLからドメイン別LLM設定を読み込み"""
-        if self._loaded or self._configs is None:
-            return
+    def initialize(self, llm_config: Dict[str, Any], domain_kwargs: Dict[str, Any]):
+        """ドメイン設定を初期化
         
-        try:
-            self._domain_kwargs = self._configs.copy()
-            self._loaded = True
-            logger.info(f"Loaded {len(self._domain_kwargs)} domain kwargs configurations")
-        except Exception as e:
-            logger.warning(f"Failed to load domain kwargs from YAML: {e}")
-            self._domain_kwargs = {}
-    
+        Args:
+            llm_config: LLMモデルの基本設定（backend, model_name, base_url等）
+            domain_kwargs: ドメイン別のLLMパラメータ設定
+        """
+        self._loaded = False
+        self._llm_config = llm_config
+        self._domain_kwargs = domain_kwargs
+        self._domain_llm_cache.clear()
+        self._loaded = True
+        self._create_domain_llm_instances()    
 
-    def _create_domain_llm_instances(cls):
+    def _create_domain_llm_instances(self):
         """全ドメインのLLMインスタンスを事前生成してキャッシュ"""
-        if not cls._loaded or cls._llm_config is None:
+        if not self._loaded or not self._llm_config:
             return
         
         # llm_configからLLMの基本設定を取得
-        backend = cls._llm_config.get("backend")
-        model_name = cls._llm_config.get("model_name")
-        base_url = cls._llm_config.get("base_url")
+        backend = self._llm_config.get("backend")
+        model_name = self._llm_config.get("model_name")
+        base_url = self._llm_config.get("base_url")
         
         if not all([backend, model_name, base_url]):
             logger.error("Invalid llm_config: missing backend, model_name, or base_url")
             return
         
-        for domain_name, kwargs in cls._domain_kwargs.items():
+        for domain_name, kwargs in self._domain_kwargs.items():
             try:
                 # additional_kwargsを処理
                 additional_kwargs = kwargs.get("additional_kwargs", {})
@@ -76,34 +63,30 @@ class _DomainLLMSettings:
                     base_url=base_url,
                     **llm_kwargs
                 )
-                cls._domain_llm_cache[domain_name] = llm_instance
+                self._domain_llm_cache[domain_name] = llm_instance
                 logger.debug(f"Created LLM instance for domain '{domain_name}'")
             except Exception as e:
                 logger.warning(f"Failed to create LLM instance for domain '{domain_name}': {e}")
         
-        logger.info(f"Created {len(cls._domain_llm_cache)} domain LLM instances")
+        logger.info(f"Created {len(self._domain_llm_cache)} domain LLM instances")
     
     def get_domain_info(self) -> dict:
-        """現在のドメイン設定情報を取得（テスト記録用）"""
-        if not self._loaded and self._configs:
-            self._load_domain_kwargs()
-        
         return {
             "loaded": self._loaded,
             "available_domains": list(self._domain_kwargs.keys()),
             "domain_configs": self._domain_kwargs,
         }
 
-    def _get_domain_llm(cls, domain_name: str) -> BaseLLM:
+    def _get_domain_llm(self, domain_name: str) -> BaseLLM:
         """指定ドメインのキャッシュ済みLLMを取得"""
         # キャッシュから取得
-        if domain_name in cls._domain_llm_cache:
-            return cls._domain_llm_cache[domain_name]
+        if domain_name in self._domain_llm_cache:
+            return self._domain_llm_cache[domain_name]
         
         # デフォルトにフォールバック
-        if "default" in cls._domain_llm_cache:
+        if "default" in self._domain_llm_cache:
             logger.warning(f"No cached LLM for domain '{domain_name}', using default")
-            return cls._domain_llm_cache["default"]
+            return self._domain_llm_cache["default"]
         
         # 最終フォールバック
         logger.warning(f"No configuration found for domain '{domain_name}', using Settings.llm")

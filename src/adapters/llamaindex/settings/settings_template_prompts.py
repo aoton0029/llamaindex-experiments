@@ -13,25 +13,29 @@ logger = logging.getLogger(__name__)
 class _TemplatePromptSettings:
     """テンプレートプロンプト設定クラス"""
     
-    _configs: Optional[Dict[str, Any]] = None
+    _prompt_tmpls: Optional[Dict[str, Any]] = None
     _templates: Dict[str, Any] = {}
     _templates_loaded: bool = False
 
-    def initialize(self, configs: Optional[Dict[str, Any]] = None):
-        """ConfigManagerを設定してテンプレートを初期化"""
+    def initialize(self, prompt_tmpls: Optional[Dict[str, Any]] = None):
+        """テンプレートを初期化
+        
+        Args:
+            prompt_tmpls: YAMLから読み込まれたtemplate_promptsの辞書
+        """
         self._templates_loaded = False
-        self._configs = configs
+        self._prompt_tmpls = prompt_tmpls
         self._templates = {}  # 辞書をリセット
         self._load_templates()
 
     def _load_templates(self):
         """YAMLからテンプレート文字列のみを読み込み、辞書に格納"""
-        if self._templates_loaded or self._configs is None:
+        if self._templates_loaded or self._prompt_tmpls is None:
             return
         
         try:
-            config = self._configs
-            
+            config = self._prompt_tmpls
+
             # Simple Input
             if "simple_input" in config:
                 simple_input = config["simple_input"]
@@ -125,7 +129,7 @@ class _TemplatePromptSettings:
     
     def get(self, key: str, default: Any = None) -> Any:
         """テンプレートを取得（辞書アクセス）"""
-        if not self._templates_loaded and self._configs:
+        if not self._templates_loaded and self._prompt_tmpls:
             self._load_templates()
         return self._templates.get(key, default)
     
@@ -328,7 +332,7 @@ class _TemplatePromptSettings:
     
     def get_templates_info(self) -> dict:
         """現在のテンプレート設定情報を取得（テスト記録用）"""
-        if not self._templates_loaded and self._configs:
+        if not self._templates_loaded and self._prompt_tmpls:
             self._load_templates()
         
         return {
