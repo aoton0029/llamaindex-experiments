@@ -1,14 +1,13 @@
 import logging
 from typing import List, Optional, Dict, Any
 from llama_index.core.query_engine import BaseQueryEngine, RetrieverQueryEngine
-from factories import (
+from src.adapters.llamaindex.factories import (
     QueryEngineFactory,
     ResponseSynthesizerFactory,
-    TemplatePromptSettings,
 )
+from src.adapters.llamaindex.settings import DomainLLMSettings
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core.retrievers import BaseRetriever
-from retrievers import ConversationRetrieverFactory
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ class ConversationQueryEngine:
 
     @staticmethod
     def create(
-        retriever,
+        retriever: BaseRetriever,
         response_mode: str = "compact",
         use_custom_prompt: bool = True,
     ):
@@ -63,10 +62,12 @@ class ConversationQueryEngine:
             RetrieverQueryEngine
         """
         # ResponseSynthesizerの作成
-        response_synthesizer = get_response_synthesizer(
-            response_mode=ResponseMode(response_mode)
+        response_synthesizer = ResponseSynthesizerFactory.get(
+            llm=DomainLLMSettings.SYNTHESIZER_RESPONSE,
+            response_mode=response_mode,
         )
 
+        QueryEngineFactory.create()
         # QueryEngineの作成
         query_engine = RetrieverQueryEngine(
             retriever=retriever, response_synthesizer=response_synthesizer
@@ -79,8 +80,6 @@ class ConversationQueryEngine:
                 {"response_synthesizer:text_qa_template": qa_prompt}
             )
 
-        logger.info(
-            f"QueryEngine作成完了: mode={response_mode}, custom_prompt={use_custom_prompt}"
-        )
+        logger.info(f"QueryEngine作成完了: mode={response_mode}, custom_prompt={use_custom_prompt}")
 
         return query_engine

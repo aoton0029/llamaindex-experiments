@@ -10,7 +10,6 @@ class Utterance:
     end_time: float    # 発話終了時間（秒）
     content: str       # 発話内容
 
-
 @dataclass
 class ConversationSession:
     """会話セッション"""
@@ -28,16 +27,14 @@ class ConversationChunkMetadata:
     """会話チャンクのメタデータスキーマ定義（Milvus用）"""
     
     @staticmethod
-    def schema(dim: int = 4096) -> List[Dict]:
+    def schema(dim: int) -> CollectionSchema:
         """
         Milvus用のスキーマ定義
         
         Args:
             dim: Embeddingベクトルの次元数
-        """
-        from pymilvus import DataType, FieldSchema
-        
-        return [
+        """        
+        fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
             FieldSchema(name="node_id", dtype=DataType.VARCHAR, max_length=512),
@@ -45,4 +42,4 @@ class ConversationChunkMetadata:
             FieldSchema(name="company_name", dtype=DataType.VARCHAR, max_length=256),
             FieldSchema(name="salesperson_name", dtype=DataType.VARCHAR, max_length=128),
         ]
-
+        return CollectionSchema(fields=fields, description="Conversation Chunk Metadata Schema")
