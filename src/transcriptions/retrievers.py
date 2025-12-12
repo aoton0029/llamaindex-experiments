@@ -1,122 +1,155 @@
-# filepath: d:\開発\noto\llamaindex-experiments-main\llamaindex-experiments-main\src\transcription\retrievers.py
 import logging
 from typing import List, Optional, Dict, Any
 from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.schema import QueryBundle, NodeWithScore
 from llama_index.core.indices.base import BaseIndex
-from factories import (
-    RetrieverFactory,
-    ResponseSynthesizerFactory,
-    TemplatePromptSettings,
-    DomainLLMSettings,
-)
+from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+
+from .models import ChunkType
 
 logger = logging.getLogger(__name__)
 
 
-class ConversationRetriever(BaseRetriever):
-    """
-    会話情報用カスタムRetriever
-    
-    機能:
-    - ベクトル類似度検索
-    - メタデータフィルタ検索（会社名、営業担当者名など）
-    """
+class HybridConversationRetriever(BaseRetriever):
+    """概要と会話の2段階検索を行うレトリーバー"""
     
     def __init__(
         self,
-        index,
+        summary_index: BaseIndex,
+        conversation_index: BaseIndex,
         similarity_top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-        **kwargs
+        enable_two_stage: bool = True,
     ):
         """
         Args:
-            index: VectorStoreIndex
-            similarity_top_k: 取得する候補数
-            filters: メタデータフィルタ（例: {"会社名": "ABC商事株式会社"}）
+            summary_index: 概要・トピック用のインデックス
+            conversation_index: 会話詳細用のインデックス
+            similarity_top_k: 取得する類似ノード数
+            enable_two_stage: 2段階検索を有効にするか
         """
-        self._index = index
+        self._summary_index = summary_index
+        self._conversation_index = conversation_index
         self._similarity_top_k = similarity_top_k
-        self._filters = filters
-        super().__init__(**kwargs)
-        
-        logger.info(f"ConversationRetriever初期化: top_k={similarity_top_k}, filters={filters}")
+        self._enable_two_stage = enable_two_stage
+        super().__init__()
     
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
-        """
-        検索実行
-        
-        Args:
-            query_bundle: クエリ情報
-            
-        Returns:
-            検索結果のNodeリスト
-        """
-        # メタデータフィルタの構築
-        metadata_filters = None
-        if self._filters:
-            filter_list = []
-            for key, value in self._filters.items():
-                filter_list.append(
-                    MetadataFilter(key=key, value=value, operator=FilterOperator.EQ)
-                )
-            metadata_filters = MetadataFilters(filters=filter_list)
-        
-        # Retrieverを作成して検索
-        retriever = self._index.as_retriever(
-            similarity_top_k=self._similarity_top_k,
-            filters=metadata_filters
+        """検索実行"""
+        if not self._enable_two_stage:
+            # シンプルな検索: 両方から取得してマージ
+            return self._simple_retrieve(query_bundle)
+        else:
+            # 2段階検索: 概要で絞り込み→会話詳細
+            return self._two_stage_retrieve(query_bundle)
+    
+    def _simple_retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        """シンプルな検索: 両インデックスから結果を取得"""
+        summary_retriever = self._summary_index.as_retriever(
+            similarity_top_k=self._similarity_top_k
+        )
+        conversation_retriever = self._conversation_index.as_retriever(
+            similarity_top_k=self._similarity_top_k
         )
         
-        nodes = retriever.retrieve(query_bundle)
+        summary_nodes = summary_retriever.retrieve(query_bundle)
+        conversation_nodes = conversation_retriever.retrieve(query_bundle)
         
-        logger.info(f"検索完了: クエリ='{query_bundle.query_str}', 結果={len(nodes)}件")
+        # スコアでソートしてマージ
+        all_nodes = summary_nodes + conversation_nodes
+        all_nodes.sort(key=lambda x: x.score or 0, reverse=True)
         
-        return nodes
+        return all_nodes[:self._similarity_top_k]
+    
+    def _two_stage_retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        """2段階検索: 概要で関連セッション特定→会話詳細検索"""
+        # Stage 1: 概要から関連セッションを特定
+        summary_retriever = self._summary_index.as_retriever(
+            similarity_top_k=self._similarity_top_k
+        )
+        summary_nodes = summary_retriever.retrieve(query_bundle)
+        
+        if not summary_nodes:
+            return []
+        
+        # 関連セッションのUIDを抽出
+        relevant_session_uids = list(set(
+            node.node.metadata.get("session_uid")
+            for node in summary_nodes
+            if node.node.metadata.get("session_uid")
+        ))
+        
+        logger.info(f"Stage 1: {len(relevant_session_uids)}個の関連セッションを特定")
+        
+        # Stage 2: 特定されたセッションの会話詳細を検索
+        filters = MetadataFilters(
+            filters=[
+                MetadataFilter(
+                    key="session_uid",
+                    value=relevant_session_uids,
+                    operator=FilterOperator.IN
+                )
+            ]
+        )
+        
+        conversation_retriever = self._conversation_index.as_retriever(
+            similarity_top_k=self._similarity_top_k * 2,
+            filters=filters
+        )
+        conversation_nodes = conversation_retriever.retrieve(query_bundle)
+        
+        # 概要ノードと会話ノードを結合（概要を優先的に含める）
+        result_nodes = summary_nodes[:2] + conversation_nodes
+        result_nodes.sort(key=lambda x: x.score or 0, reverse=True)
+        
+        return result_nodes[:self._similarity_top_k]
 
 
-class MultiQueryRetriever(BaseRetriever):
-    """
-    複数クエリを実行して結果を統合するRetriever
-    要約優先検索などに使用
-    """
+class ChunkTypeFilteredRetriever(BaseRetriever):
+    """チャンク種別でフィルタリングするレトリーバー"""
     
     def __init__(
         self,
-        index,
+        index: BaseIndex,
+        chunk_types: List[ChunkType],
         similarity_top_k: int = 5,
-        query_priority: Optional[List[str]] = None,
-        **kwargs
+        additional_filters: Optional[MetadataFilters] = None,
     ):
         """
         Args:
-            index: VectorStoreIndex
-            similarity_top_k: 各クエリで取得する候補数
-            query_priority: 検索優先フィールド（例: ["要約_全体概要", "要約_決定事項"]）
+            index: 検索対象のインデックス
+            chunk_types: 検索対象のチャンク種別リスト
+            similarity_top_k: 取得する類似ノード数
+            additional_filters: 追加のメタデータフィルタ
         """
         self._index = index
+        self._chunk_types = chunk_types
         self._similarity_top_k = similarity_top_k
-        self._query_priority = query_priority or []
-        super().__init__(**kwargs)
+        self._additional_filters = additional_filters
+        super().__init__()
     
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
-        """
-        優先フィールドを考慮した検索
-        """
-        # 基本検索
-        retriever = self._index.as_retriever(similarity_top_k=self._similarity_top_k)
-        nodes = retriever.retrieve(query_bundle)
+        """検索実行"""
+        # チャンク種別フィルタを作成
+        chunk_type_values = [ct.value for ct in self._chunk_types]
         
-        # 要約フィールドを持つノードの優先度を上げる
-        if self._query_priority:
-            for node in nodes:
-                for priority_field in self._query_priority:
-                    if node.node.metadata.get(priority_field):
-                        node.score *= 1.2  # スコアを20%増加
+        filters_list = [
+            MetadataFilter(
+                key="chunk_type",
+                value=chunk_type_values,
+                operator=FilterOperator.IN
+            )
+        ]
         
-        # スコア順にソート
-        nodes.sort(key=lambda x: x.score, reverse=True)
+        # 追加フィルタがあれば結合
+        if self._additional_filters:
+            filters_list.extend(self._additional_filters.filters)
         
-        return nodes[:self._similarity_top_k]
+        filters = MetadataFilters(filters=filters_list)
+        
+        retriever = self._index.as_retriever(
+            similarity_top_k=self._similarity_top_k,
+            filters=filters
+        )
+        
+        return retriever.retrieve(query_bundle)
 

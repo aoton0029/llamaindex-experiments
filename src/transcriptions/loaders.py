@@ -3,18 +3,13 @@ import re
 from typing import List
 from llama_index.core.schema import Document
 from models import ConversationSession, ConversationSummary, Topic, Utterance
-from db_r import DatabaseManager, QueryExecutor
+import sys
+print(sys.path)
+from ..infrastructure.relational_stores.query_executor import QueryExecutor
 
 class DocumentLoader:
-    def __init__(self):
-        self.db_manager = DatabaseManager(
-            server="your_server",
-            database="your_database",
-            username="your_username",
-            password="your_password",
-            use_windows_auth=False
-        )
-        self.query_executor = QueryExecutor(self.db_manager)
+    def __init__(self, query_executor: QueryExecutor):
+        self.query_executor = query_executor
         self.base_url = "http://192.168.100.19/transcription_tasks/"
 
     def load_data(self) -> List[ConversationSession]:
@@ -33,18 +28,20 @@ class DocumentLoader:
                 # 発話情報をパース
                 utterances = []
                 for json_utterance in json_utterances:
-                    u = Utterance.from_dict(json_utterance)
+                    u = Utterance(
+                        start_time=json_utterance.get("start_time", 0.0),
+                        end_time=json_utterance.get("end_time", 0.0),
+                        content=json_utterance.get("text", "")
+                    )
                     utterances.append(u)
                 
                 # 要約情報を抽出
                 overall_summary = self._extract_overall_summary(json_summary_text)
                 topics = self._extract_topics(json_summary_text)
-                decisions = self._extract_decisions(json_summary_text)
                 
                 summary = ConversationSummary(
-                    overall_summary=overall_summary,
-                    topics=topics,
-                    decisions=decisions
+                    summary_text=overall_summary,
+                    topics=topics
                 )
                 
                 # ConversationSessionを作成
@@ -74,7 +71,7 @@ class DocumentLoader:
         """トピック抽出のロジックを実装 
         
         構成:
-        □トピック別要約
+        ◻︎トピック別要約
         Topic1: <Topic1のタイトル>
         ・<内容>
         ・<内容>
@@ -83,7 +80,7 @@ class DocumentLoader:
         ・<内容>
         ・<内容>
 
-        □決定事項
+        □...
         """
 
         if not text:
@@ -145,46 +142,14 @@ class DocumentLoader:
 
         return topics
     
-    def _extract_decisions(self, text: str) -> List[str]:
-        """ 決定事項抽出のロジックを実装 
-        
-        構成:
-        □決定事項
-        ・<内容>
-        ・<内容>
-
-        □TODO
-        """
-        if not text:
-            return []
-
-        # キャプチャ: '□決定事項' から次の '□' まで（またはテキスト末尾まで）
-        pattern = r'□\s*決定事項\s*[:：]?\s*(.*?)(?=□|$)'
-        m = re.search(pattern, text, re.S)
-        if not m:
-            return []
-
-        section = m.group(1).strip()
-
-        # 各行から『・』で始まる項目を抽出
-        items = re.findall(r'^[ \t]*・\s*(.+)$', section, re.M)
-        if items:
-            return [it.strip() for it in items]
-
-        # フォールバック: 空でない行を項目として返す
-        lines = [line.strip() for line in section.splitlines() if line.strip()]
-        return lines
-    
     def _extract_overall_summary(self, text: str) -> str:
         """ 全体概要抽出のロジックを実装 
         
         構成:
-        ...
         □全体概要
         <内容>
 
         □トピック別要約
-        ...
         """
 
         if not text:

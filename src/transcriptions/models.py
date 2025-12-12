@@ -1,45 +1,82 @@
-from typing import List, Dict, Optional
-from dataclasses import dataclass
-from datetime import datetime
-from pymilvus import CollectionSchema, FieldSchema, DataType
+import logging
+from typing import List, Optional, Dict, Any
+from enum import Enum
+from dataclasses import dataclass, field
+from pymilvus import DataType, CollectionSchema, FieldSchema
+
+logger = logging.getLogger(__name__)
+
+
+class ChunkType(str, Enum):
+    """チャンクの種別"""
+    SUMMARY = "summary"           # 全体概要
+    TOPIC = "topic"               # トピック別要約
+    CONVERSATION = "conversation"  # 会話詳細
+
 
 @dataclass
 class Utterance:
     """発話情報"""
-    start_time: float  # 発話開始時間（秒）
-    end_time: float    # 発話終了時間（秒）
-    content: str       # 発話内容
+    start_time: float
+    end_time: float
+    content: str
+
+@dataclass
+class Topic:
+    """トピック情報"""
+    title: str
+    contents: List[str]
+
+@dataclass
+class ConversationSummary:
+    """会話の概要情報"""
+    summary_text: str
+    topics: List[Topic]
 
 @dataclass
 class ConversationSession:
     """会話セッション"""
-    uid: str                              # 会話セッションのユニークID
-    salesperson_name: Optional[str]       # 営業担当者名
-    company_name: Optional[str]           # 会社名
-    branch_name: Optional[str]            # 拠点名
-    department_name: Optional[str]        # 部署名
-    client_contact_name: Optional[str]    # 取引先担当者名
-    utterances: List[Utterance]           # 発話情報のリスト
-    summary: Optional[Dict[str, str]]     # 要約（全体概要、トピック別要約、決定事項）
+    uid: str
+    sales_person: str
+    company_name: str
+    branch_name: Optional[str]
+    department_name: Optional[str]
+    client_person: str
+    utterances: List[Utterance]
+    summary: ConversationSummary
+    created_at: Optional[str] = None
 
 
+
+@dataclass
 class ConversationChunkMetadata:
-    """会話チャンクのメタデータスキーマ定義（Milvus用）"""
+    """会話チャンクのメタデータ"""
+    session_uid: str
+    chunk_type: str  # ChunkType
+    sales_person: str
+    company_name: str
+    branch_name: Optional[str] = None
+    department_name: Optional[str] = None
+    client_person: Optional[str] = None
+    topic_title: Optional[str] = None  # トピックの場合のタイトル
+    start_time: Optional[float] = None  # 会話チャンクの場合の開始時間
+    end_time: Optional[float] = None    # 会話チャンクの場合の終了時間
     
     @staticmethod
     def schema(dim: int) -> CollectionSchema:
-        """
-        Milvus用のスキーマ定義
-        
-        Args:
-            dim: Embeddingベクトルの次元数
-        """        
+        """Milvus用のスキーマ定義"""
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
-            FieldSchema(name="node_id", dtype=DataType.VARCHAR, max_length=512),
-            FieldSchema(name="uid", dtype=DataType.VARCHAR, max_length=256),
-            FieldSchema(name="company_name", dtype=DataType.VARCHAR, max_length=256),
-            FieldSchema(name="salesperson_name", dtype=DataType.VARCHAR, max_length=128),
+            FieldSchema(name="session_uid", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="chunk_type", dtype=DataType.VARCHAR, max_length=32),
+            FieldSchema(name="sales_person", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="company_name", dtype=DataType.VARCHAR, max_length=512),
+            FieldSchema(name="branch_name", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="department_name", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="client_person", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="topic_title", dtype=DataType.VARCHAR, max_length=512),
+            FieldSchema(name="start_time", dtype=DataType.FLOAT),
+            FieldSchema(name="end_time", dtype=DataType.FLOAT),
         ]
         return CollectionSchema(fields=fields, description="Conversation Chunk Metadata Schema")

@@ -1,10 +1,10 @@
-# filepath: d:\開発\noto\llamaindex-experiments-main\llamaindex-experiments-main\src\db_r\query.py
-
 import pandas as pd
 from sqlalchemy import text
 from typing import Optional, Dict, Any, List
 import logging
-from .database_manager import DatabaseManager
+
+from .sqlserver_client import SQLServerClient
+from .manager import RelationalStoreManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class QueryExecutor:
     executor.write_dataframe(df, "new_table", if_exists="replace")
     """
     
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager: RelationalStoreManager):
         """
         QueryExecutor を初期化
         
@@ -56,7 +56,7 @@ class QueryExecutor:
             if params:
                 df = pd.read_sql(
                     text(query),
-                    self.db_manager.engine,
+                    self.db_manager.get_client().engine,
                     params=params,
                     parse_dates=parse_dates,
                     chunksize=chunksize,
@@ -65,7 +65,7 @@ class QueryExecutor:
             else:
                 df = pd.read_sql(
                     query,
-                    self.db_manager.engine,
+                    self.db_manager.get_client().engine,
                     parse_dates=parse_dates,
                     chunksize=chunksize,
                     **kwargs
@@ -146,7 +146,7 @@ class QueryExecutor:
         try:
             row_count = df.to_sql(
                 table_name,
-                self.db_manager.engine,
+                self.db_manager.get_client().engine,
                 schema=schema,
                 if_exists=if_exists,
                 index=index,
@@ -276,8 +276,6 @@ class QueryExecutor:
         return df.iloc[0]['count']
 
 
-# 便利な関数
-
 def create_query_executor(
     server: str,
     database: str,
@@ -285,24 +283,12 @@ def create_query_executor(
     password: Optional[str] = None,
     **kwargs
 ) -> QueryExecutor:
-    """
-    QueryExecutor を簡単に作成するヘルパー関数
-    
-    Args:
-        server: SQL Server のホスト名
-        database: データベース名
-        username: ユーザー名
-        password: パスワード
-        **kwargs: DatabaseManager に渡す追加パラメータ
-    
-    Returns:
-        QueryExecutor インスタンス
-    """
-    db_manager = DatabaseManager(
+    """QueryExecutor を簡単に作成するヘルパー関数"""
+    db_client = SQLServerClient(
         server=server,
         database=database,
         username=username,
         password=password,
         **kwargs
     )
-    return QueryExecutor(db_manager)
+    return QueryExecutor(db_client)
